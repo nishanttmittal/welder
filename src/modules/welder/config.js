@@ -6,7 +6,9 @@ export const APP_TITLE = 'Welder Contractor'
 
 /** Owner — full access incl. approve/edit/delete + log. */
 export const ADMIN_PASSWORD = '6133923_N'
-/** Production manager — review & pass entries only. Change anytime. */
+/** Second role (reviews & passes entries) — label is just a display name,
+ *  change to anything you like. Password: nsp@123. */
+export const INCHARGE_LABEL = 'User1'
 export const MANAGER_PASSWORD = 'nsp@123'
 
 /**

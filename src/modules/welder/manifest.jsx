@@ -5,7 +5,7 @@
 import { WelderProvider, useWelder } from './WelderContext'
 import { todayStr } from '../../core/utils/format'
 import { totalSent } from './logic/report'
-import { ADMIN_PASSWORD, MANAGER_PASSWORD } from './config'
+import { ADMIN_PASSWORD, MANAGER_PASSWORD, INCHARGE_LABEL } from './config'
 import { pipeline } from './logic/report'
 import Entry from './pages/Entry'
 import ReviewQueue from './pages/ReviewQueue'
@@ -41,13 +41,14 @@ export const welderModule = {
   HomeStats,
   adminPassword: ADMIN_PASSWORD,
   managerPassword: MANAGER_PASSWORD,
+  inchargeLabel: INCHARGE_LABEL,
   floorPageKey: 'entry',
   floorLabel: 'Welder',
   floorIcon: '👷',
   // roles: which logged-in role sees the page. Staff use the entry page (floor).
   pages: [
     { key: 'entry',     title: 'Material Sent',  desc: 'Record material sent for finishing',   icon: '➕', color: 'from-amber-600 to-amber-700', floor: true, Component: Entry },
-    { key: 'review',    title: 'Approvals',      desc: 'Pass / approve entries',               icon: '✅', color: 'from-emerald-600 to-emerald-700', roles: ['manager', 'owner'], Component: ReviewQueue },
+    { key: 'review',    title: 'Approvals',      desc: 'Pass / approve entries',               icon: '✅', color: 'from-emerald-600 to-emerald-700', roles: ['incharge', 'owner'], Component: ReviewQueue },
     { key: 'dashboard', title: 'Dashboard',      desc: 'Approved totals, by welder & party',   icon: '📊', color: 'from-blue-600 to-blue-700',   roles: ['owner'], Component: Dashboard },
     { key: 'history',   title: 'History',        desc: 'Edit, void or delete (logged)',        icon: '🗂️', color: 'from-amber-500 to-amber-600', roles: ['owner'], Component: History },
     { key: 'export',    title: 'Export / Share', desc: 'Daily report on WhatsApp',             icon: '📄', color: 'from-violet-600 to-violet-700', roles: ['owner'], Component: Export },

@@ -24,7 +24,7 @@ export default function ReviewQueue({ level = 'manager' }) {
       .sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.createdAt || '').localeCompare(b.createdAt || ''))
   }, [dispatches.list, owner])
 
-  const pass = (d) => { dispatches.update(d.id, { status: 'passed', passedBy: 'manager' }); log('PASS', `${d.finishedName || d.productName} × ${d.qty} · ${d.welder}`, 'manager', d.id); show('Passed ✓') }
+  const pass = (d) => { dispatches.update(d.id, { status: 'passed', passedBy: 'incharge' }); log('PASS', `${d.finishedName || d.productName} × ${d.qty} · ${d.welder}`, 'incharge', d.id); show('Passed ✓') }
   const approve = (d) => { dispatches.update(d.id, { status: 'approved', approvedBy: 'owner' }); log('APPROVE', `${d.finishedName || d.productName} × ${d.qty} · ${d.welder}`, 'owner', d.id); show('Approved ✓ → main stock') }
   const sendBack = (d) => { dispatches.update(d.id, { status: 'pending', passedBy: '' }); log('SENDBACK', `${d.finishedName || d.productName} × ${d.qty}`, 'owner', d.id); show('Sent back') }
 
