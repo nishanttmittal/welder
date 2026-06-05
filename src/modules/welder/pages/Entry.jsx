@@ -40,8 +40,10 @@ export default function Entry({ floor = false, operator = '' }) {
     .filter(d => d.date === date && (!welder || d.welder === welder))
     .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
 
-  // Worker self-correction: only the most recent entry, same day, can be fixed.
-  const editableId = date === todayStr() ? todays[0]?.id : null
+  // Worker self-correction: only the most recent SAME-DAY entry, and only while
+  // still PENDING (not yet passed by the manager), can the welder fix/cancel.
+  const last = todays[0]
+  const editableId = (date === todayStr() && last && (last.status || 'pending') === 'pending') ? last.id : null
   const openFix = (d) => { setFixing(d); setFixQty(String(d.qty)) }
   const saveFix = () => {
     const v = Number(fixQty) || 0

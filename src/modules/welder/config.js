@@ -4,8 +4,18 @@
 
 export const APP_TITLE = 'Welder Contractor'
 
-/** Admin password (same pattern as the other UNICO apps). */
+/** Owner — full access incl. approve/edit/delete + log. */
 export const ADMIN_PASSWORD = '6133923_N'
+/** Production manager — review & pass entries only. Change anytime. */
+export const MANAGER_PASSWORD = 'nsp@123'
+
+/**
+ * Entry lifecycle (approval flow): staff creates → pending; manager → passed;
+ * owner → approved (counts toward main totals). Owner can approve directly.
+ */
+export const STATUS = { pending: 'pending', passed: 'passed', approved: 'approved' }
+export const statusLabel = (s) => ({ pending: 'Pending', passed: 'Passed', approved: 'Approved' }[s] || 'Pending')
+export const statusColor = (s) => ({ pending: 'bg-slate-100 text-slate-600', passed: 'bg-amber-100 text-amber-700', approved: 'bg-emerald-100 text-emerald-700' }[s] || 'bg-slate-100 text-slate-600')
 
 /** Quick-add chips on the quantity stepper. */
 export const QUICK_QTYS = [5, 10, 25, 50, 100, 200]

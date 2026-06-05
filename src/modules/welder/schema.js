@@ -19,6 +19,10 @@ export const dispatchSchema = [
   field({ name: 'party',        label: 'Sent to', type: 'text',   default: '' }),
   field({ name: 'qty',          label: 'Quantity', type: 'number', default: 0, required: true }),
   field({ name: 'remarks',      label: 'Remarks', type: 'text',   default: '' }),
+  // Approval flow: pending (staff) → passed (manager) → approved (owner).
+  field({ name: 'status',       label: 'Status',  type: 'text',   default: 'pending' }),
+  field({ name: 'passedBy',     label: 'Passed by', type: 'text', default: '' }),
+  field({ name: 'approvedBy',   label: 'Approved by', type: 'text', default: '' }),
 ]
 
 export const productSchema = [

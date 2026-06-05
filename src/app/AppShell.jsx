@@ -1,9 +1,10 @@
 /**
- * AppShell — mounts the module Provider, then routes to one of two interfaces:
- *   • Welder (floor) — entry-only page, no password. `?welder` (or `?floor`)
- *     locks the device to this view (no admin, no Switch).
- *   • Owner/Admin — password-gated console (card grid + all pages).
- * Role is remembered per device.
+ * AppShell — 3-tier access for the Welder app:
+ *   • Staff (welder): ?welder=1&who=Name → entry only (data entry, status pending).
+ *   • Manager: ?role=manager (or chooser) → review & PASS entries; no edit/create/delete.
+ *   • Owner: ?role=owner (or chooser) → approve + full + dashboard + history + admin.
+ * iPhone fix: the Switch button lives in a BOTTOM bar (not under the status/signal
+ * area at the top), and top bars use safe-area padding so their controls are reachable.
  */
 import { useState } from 'react'
 import { getModule } from '../modules/registry'
@@ -14,56 +15,50 @@ import RoleChooser from './RoleChooser'
 
 const ROLE_KEY = 'wld:role'
 
-function RoleBar({ label, onSwitch }) {
+/** Bottom-fixed bar — reachable on phones, away from the top status area. */
+function BottomBar({ label, onSwitch }) {
   return (
-    <div className="bg-slate-900 text-slate-300 px-4 py-2 flex items-center justify-between text-xs no-print">
-      <span className="font-semibold tracking-wide uppercase">{label}</span>
-      {onSwitch && (
-        <button onClick={onSwitch} className="flex items-center gap-1 text-slate-400 hover:text-white font-medium">
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4M16 17H4m0 0l4 4m-4-4l4-4" />
-          </svg>
-          Switch
-        </button>
-      )}
+    <div className="fixed bottom-0 inset-x-0 bg-slate-900 text-slate-300 px-4 flex items-center justify-between text-xs no-print z-30"
+      style={{ paddingTop: '0.6rem', paddingBottom: 'calc(0.6rem + env(safe-area-inset-bottom))' }}>
+      <span className="font-semibold tracking-wide uppercase truncate">{label}</span>
+      {onSwitch && <button onClick={onSwitch} className="flex items-center gap-1 bg-white/15 rounded-lg px-3 py-1.5 font-bold flex-shrink-0">⇄ Switch</button>}
     </div>
   )
 }
 
-function AdminConsole({ module, onSwitch }) {
-  const [activeKey, setActiveKey] = useState(null)
-  const activePage = module.pages.find(p => p.key === activeKey)
-  return (
-    <div className="min-h-screen bg-slate-50">
-      <RoleBar label="Admin Console" onSwitch={onSwitch} />
-      {activePage ? (
-        <>
-          <NavBar title={activePage.title} onHome={() => setActiveKey(null)} />
-          <activePage.Component />
-        </>
-      ) : (
-        <ModuleHome module={module} onOpen={setActiveKey} />
-      )}
-    </div>
-  )
-}
-
-function FloorView({ module, onSwitch, operator = '' }) {
+function StaffView({ module, operator, onSwitch }) {
   const page = module.pages.find(p => p.key === module.floorPageKey) || module.pages[0]
-  const label = module.floorLabel || 'Worker'
   return (
-    <div className="min-h-screen bg-slate-50">
-      <RoleBar label={operator ? `${label} · ${operator}` : label} onSwitch={onSwitch} />
-      <header className="bg-gradient-to-r from-amber-600 to-amber-700 text-white px-5 py-4 no-print">
+    <div className="min-h-screen bg-slate-50 pb-16">
+      <header className="bg-gradient-to-r from-amber-600 to-amber-700 text-white px-5 no-print" style={{ paddingTop: 'calc(0.9rem + env(safe-area-inset-top))', paddingBottom: '0.9rem' }}>
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <div className="w-9 h-9 bg-white/15 rounded-xl flex items-center justify-center text-lg">{module.icon}</div>
-          <div>
-            <div className="font-bold leading-tight">{module.title}</div>
-            <div className="text-white/80 text-xs">{page.title}{operator ? ` · ${operator}` : ''}</div>
-          </div>
+          <div><div className="font-bold leading-tight">{module.title}</div><div className="text-white/80 text-xs">{page.title}{operator ? ` · ${operator}` : ''}</div></div>
         </div>
       </header>
       <page.Component floor operator={operator} />
+      {onSwitch && <BottomBar label={`Welder${operator ? ' · ' + operator : ''}`} onSwitch={onSwitch} />}
+    </div>
+  )
+}
+
+function Console({ module, level, onSwitch }) {
+  const [activeKey, setActiveKey] = useState(null)
+  const owner = level === 'owner'
+  const pages = module.pages.filter(p => (p.roles || []).includes(level))
+  const view = { ...module, pages }
+  const activePage = pages.find(p => p.key === activeKey)
+  return (
+    <div className="min-h-screen bg-slate-50 pb-16">
+      {activePage ? (
+        <>
+          <NavBar title={activePage.title} onHome={() => setActiveKey(null)} />
+          <activePage.Component level={level} owner={owner} />
+        </>
+      ) : (
+        <ModuleHome module={view} onOpen={setActiveKey} />
+      )}
+      <BottomBar label={owner ? 'Owner' : 'Production Manager'} onSwitch={onSwitch} />
     </div>
   )
 }
@@ -76,23 +71,26 @@ export default function AppShell({ moduleId }) {
   const reset = () => { localStorage.removeItem(ROLE_KEY); setRole(null) }
 
   const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
-  const floorOnly = params && (params.has('welder') || params.has('floor'))
+  const staffLock = params && (params.has('welder') || params.has('floor'))
   const who = (params && params.get('who')) || ''
+  const roleParam = params && params.get('role') // 'manager' | 'owner' (dedicated links)
+
+  if (staffLock) return <Provider><StaffView module={module} operator={who} /></Provider>
+
+  const effective = roleParam === 'manager' || roleParam === 'owner' ? roleParam : role
 
   return (
     <Provider>
-      {floorOnly ? (
-        <FloorView module={module} operator={who} />
-      ) : (
-        <>
-          {!role && <RoleChooser title={module.title} icon={module.icon} floorLabel={module.floorLabel} floorIcon={module.floorIcon} onPick={pick} />}
-          {role === 'floor' && <FloorView module={module} onSwitch={reset} operator={who} />}
-          {role === 'admin' && (
-            <PasswordGate password={module.adminPassword} title="Admin Console — Login">
-              <AdminConsole module={module} onSwitch={reset} />
-            </PasswordGate>
-          )}
-        </>
+      {!effective && <RoleChooser title={module.title} icon={module.icon} onPick={pick} />}
+      {effective === 'manager' && (
+        <PasswordGate password={[module.managerPassword, module.adminPassword]} title="Production Manager — Login">
+          <Console module={module} level="manager" onSwitch={roleParam ? null : reset} />
+        </PasswordGate>
+      )}
+      {effective === 'owner' && (
+        <PasswordGate password={module.adminPassword} title="Owner — Login">
+          <Console module={module} level="owner" onSwitch={roleParam ? null : reset} />
+        </PasswordGate>
       )}
     </Provider>
   )

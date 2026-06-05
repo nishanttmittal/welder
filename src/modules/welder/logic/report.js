@@ -5,6 +5,16 @@
 const num = (v) => Number(v) || 0
 const inRange = (d, from, to) => (!from || d.date >= from) && (!to || d.date <= to)
 
+/** Only approved entries count toward "main" totals. */
+export const approvedOnly = (dispatches) => dispatches.filter(d => d.status === 'approved')
+
+/** Counts (entries + qty) by approval status, for the pipeline view. */
+export function pipeline(dispatches) {
+  const o = { pending: { n: 0, q: 0 }, passed: { n: 0, q: 0 }, approved: { n: 0, q: 0 } }
+  for (const d of dispatches) { const s = d.status || 'pending'; if (o[s]) { o[s].n++; o[s].q += num(d.qty) } }
+  return o
+}
+
 /** Total pieces sent in a date range. */
 export const totalSent = (dispatches, from, to) =>
   dispatches.filter(d => inRange(d, from, to)).reduce((s, d) => s + num(d.qty), 0)

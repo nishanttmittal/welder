@@ -9,7 +9,7 @@ export default function ModuleHome({ module, onOpen }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="bg-gradient-to-r from-slate-800 to-slate-900 text-white px-6 py-8">
+      <div className="bg-gradient-to-r from-slate-800 to-slate-900 text-white px-6 pb-8" style={{ paddingTop: 'calc(2rem + env(safe-area-inset-top))' }}>
         <div className="max-w-lg mx-auto">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center text-xl">{icon}</div>
