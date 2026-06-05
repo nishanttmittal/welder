@@ -25,6 +25,8 @@ export default function Entry({ floor = false }) {
   const [qty, setQty] = useState('')
   const [remarks, setRemarks] = useState('')
   const [confirming, setConfirming] = useState(false)
+  const [fixing, setFixing] = useState(null)
+  const [fixQty, setFixQty] = useState('')
 
   const n = Number(qty) || 0
   const finalName = productName ? finishedName(productName, finish) : ''
@@ -34,6 +36,22 @@ export default function Entry({ floor = false }) {
   const todays = dispatches.list
     .filter(d => d.date === date && (!welder || d.welder === welder))
     .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+
+  // Worker self-correction: only the most recent entry, same day, can be fixed.
+  const editableId = date === todayStr() ? todays[0]?.id : null
+  const openFix = (d) => { setFixing(d); setFixQty(String(d.qty)) }
+  const saveFix = () => {
+    const v = Number(fixQty) || 0
+    dispatches.update(fixing.id, { qty: v })
+    log('FIX', `${fixing.finishedName || fixing.productName}: ${fixing.qty}→${v} (welder, same-day)`, floor ? 'welder' : 'admin')
+    show('Corrected ✓'); setFixing(null)
+  }
+  const cancelEntry = (d) => {
+    if (!confirm(`Cancel this entry (${d.finishedName || d.productName} × ${d.qty})? It will be voided to 0.`)) return
+    dispatches.update(d.id, { qty: 0 })
+    log('VOID', `${d.finishedName || d.productName} × ${d.qty} → 0 (welder cancel)`, floor ? 'welder' : 'admin')
+    show('Entry cancelled ✓')
+  }
 
   const pickProduct = (name) => {
     setProductName(name)
@@ -149,17 +167,39 @@ export default function Entry({ floor = false }) {
         ) : (
           <div className="space-y-2">
             {todays.map(d => (
-              <div key={d.id} className="flex items-center justify-between bg-slate-50 rounded-xl px-4 py-3">
-                <div>
-                  <div className="font-semibold text-slate-700">{d.finishedName || d.productName}</div>
-                  <div className="text-xs text-slate-400">→ {d.party}</div>
+              <div key={d.id} className="bg-slate-50 rounded-xl px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className={`font-semibold ${d.qty === 0 ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{d.finishedName || d.productName}</div>
+                    <div className="text-xs text-slate-400">→ {d.party}</div>
+                  </div>
+                  <span className={`font-mono font-bold ${d.qty === 0 ? 'text-slate-400' : 'text-amber-700'}`}>{d.qty === 0 ? 'cancelled' : `× ${fmtNum(d.qty)}`}</span>
                 </div>
-                <span className="font-mono font-bold text-amber-700">× {fmtNum(d.qty)}</span>
+                {d.id === editableId && d.qty > 0 && (
+                  <div className="flex gap-2 mt-2">
+                    <button onClick={() => openFix(d)} className="flex-1 text-xs font-bold text-blue-600 bg-blue-50 rounded-lg py-1.5">✎ Fix qty</button>
+                    <button onClick={() => cancelEntry(d)} className="flex-1 text-xs font-bold text-red-600 bg-red-50 rounded-lg py-1.5">✕ Cancel</button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         )}
       </Card>
+
+      {/* fix last entry (worker, same-day) */}
+      {fixing && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-5" onClick={() => setFixing(null)}>
+          <Card className="p-6 w-full max-w-sm space-y-4" onClick={e => e.stopPropagation()}>
+            <FieldLabel>Fix last entry · {fixing.finishedName || fixing.productName}</FieldLabel>
+            <div><FieldLabel>Quantity</FieldLabel><div className="mt-1.5"><NumberStepper value={fixQty} onChange={setFixQty} quickAdds={QUICK_QTYS} /></div></div>
+            <div className="flex gap-3">
+              <Button variant="ghost" className="flex-1" onClick={() => setFixing(null)}>Cancel</Button>
+              <Button variant="primary" className="flex-1 !bg-amber-600" onClick={saveFix}>Save</Button>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* confirm */}
       {confirming && (
