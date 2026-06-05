@@ -48,22 +48,22 @@ function AdminConsole({ module, onSwitch }) {
   )
 }
 
-function FloorView({ module, onSwitch }) {
+function FloorView({ module, onSwitch, operator = '' }) {
   const page = module.pages.find(p => p.key === module.floorPageKey) || module.pages[0]
   const label = module.floorLabel || 'Worker'
   return (
     <div className="min-h-screen bg-slate-50">
-      <RoleBar label={label} onSwitch={onSwitch} />
+      <RoleBar label={operator ? `${label} · ${operator}` : label} onSwitch={onSwitch} />
       <header className="bg-gradient-to-r from-amber-600 to-amber-700 text-white px-5 py-4 no-print">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <div className="w-9 h-9 bg-white/15 rounded-xl flex items-center justify-center text-lg">{module.icon}</div>
           <div>
             <div className="font-bold leading-tight">{module.title}</div>
-            <div className="text-white/80 text-xs">{page.title}</div>
+            <div className="text-white/80 text-xs">{page.title}{operator ? ` · ${operator}` : ''}</div>
           </div>
         </div>
       </header>
-      <page.Component floor />
+      <page.Component floor operator={operator} />
     </div>
   )
 }
@@ -77,15 +77,16 @@ export default function AppShell({ moduleId }) {
 
   const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
   const floorOnly = params && (params.has('welder') || params.has('floor'))
+  const who = (params && params.get('who')) || ''
 
   return (
     <Provider>
       {floorOnly ? (
-        <FloorView module={module} />
+        <FloorView module={module} operator={who} />
       ) : (
         <>
           {!role && <RoleChooser title={module.title} icon={module.icon} floorLabel={module.floorLabel} floorIcon={module.floorIcon} onPick={pick} />}
-          {role === 'floor' && <FloorView module={module} onSwitch={reset} />}
+          {role === 'floor' && <FloorView module={module} onSwitch={reset} operator={who} />}
           {role === 'admin' && (
             <PasswordGate password={module.adminPassword} title="Admin Console — Login">
               <AdminConsole module={module} onSwitch={reset} />

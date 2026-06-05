@@ -9,14 +9,15 @@ import { todayStr, daysAgoStr, fmtNum, fmtDate } from '../../../core/utils/forma
 import { useWelder } from '../WelderContext'
 import { FINISHES, finishedName, QUICK_QTYS } from '../config'
 
-export default function Entry({ floor = false }) {
+export default function Entry({ floor = false, operator = '' }) {
   const { dispatches, products, welders, parties, log, lastUsed } = useWelder()
   const { msg, show } = useToast()
 
   const productList = useMemo(() => [...products.list].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name)), [products.list])
   const remembered = lastUsed.get()
 
-  const [welder, setWelder] = useState(remembered.welder || welders.list[0]?.name || '')
+  // On a dedicated phone (?who=Naveen) the welder is fixed and locked.
+  const [welder, setWelder] = useState(operator || remembered.welder || welders.list[0]?.name || '')
   const [date, setDate] = useState(todayStr())
   const [search, setSearch] = useState('')
   const [productName, setProductName] = useState('')
@@ -89,8 +90,12 @@ export default function Entry({ floor = false }) {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <FieldLabel>Welder</FieldLabel>
-            <Select className="mt-1" value={welder} onChange={e => setWelder(e.target.value)}
-              options={welders.list.map(w => ({ value: w.name, label: w.name }))} />
+            {operator ? (
+              <div className="mt-1 w-full border-2 border-slate-200 rounded-2xl px-4 py-2.5 text-base font-bold text-slate-700 bg-slate-50">{operator}</div>
+            ) : (
+              <Select className="mt-1" value={welder} onChange={e => setWelder(e.target.value)}
+                options={welders.list.map(w => ({ value: w.name, label: w.name }))} />
+            )}
           </div>
           <div>
             <FieldLabel>Date</FieldLabel>
