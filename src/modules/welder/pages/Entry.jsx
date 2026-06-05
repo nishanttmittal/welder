@@ -21,10 +21,12 @@ export default function Entry({ floor = false, operator = '' }) {
   const [date, setDate] = useState(todayStr())
   const [search, setSearch] = useState('')
   const [productName, setProductName] = useState('')
-  const [finish, setFinish] = useState('chrome')
-  const [party, setParty] = useState('')
+  // Remember the welder's last finish + destination so repeat sends are fast.
+  const [finish, setFinish] = useState(remembered.finish || 'chrome')
+  const [party, setParty] = useState(remembered.party || '')
   const [qty, setQty] = useState('')
   const [remarks, setRemarks] = useState('')
+  const [showNote, setShowNote] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [fixing, setFixing] = useState(null)
   const [fixQty, setFixQty] = useState('')
@@ -77,9 +79,9 @@ export default function Entry({ floor = false, operator = '' }) {
     setConfirming(false)
     dispatches.insert({ date, welder, productName, finish, finishedName: finalName, party, qty: n, remarks: remarks.trim() })
     log('SENT', `${welder}: ${finalName} × ${n} → ${party} on ${fmtDate(date)}`, floor ? 'welder' : 'admin')
-    lastUsed.set({ ...lastUsed.get(), welder })
+    lastUsed.set({ ...lastUsed.get(), welder, finish, party }) // remember for next time
     show(`Saved: ${finalName} × ${fmtNum(n)} ✓`)
-    setProductName(''); setQty(''); setRemarks(''); setSearch('')
+    setProductName(''); setQty(''); setRemarks(''); setShowNote(false); setSearch('')
   }
 
   return (
@@ -152,10 +154,14 @@ export default function Entry({ floor = false, operator = '' }) {
             <div className="mt-1.5"><NumberStepper value={qty} onChange={setQty} quickAdds={QUICK_QTYS} /></div>
           </div>
 
-          <div>
-            <FieldLabel>Remarks (optional)</FieldLabel>
-            <TextInput className="mt-1.5" placeholder="Any note…" value={remarks} onChange={e => setRemarks(e.target.value)} />
-          </div>
+          {showNote ? (
+            <div>
+              <FieldLabel>Note</FieldLabel>
+              <TextInput className="mt-1.5" placeholder="Any note…" value={remarks} onChange={e => setRemarks(e.target.value)} />
+            </div>
+          ) : (
+            <button onClick={() => setShowNote(true)} className="text-sm text-amber-600 font-semibold">+ Add note</button>
+          )}
 
           <Button variant="primary" size="lg" className="w-full text-lg py-5 !bg-amber-600 !shadow-amber-300" onClick={requestSave}>SAVE</Button>
         </Card>
