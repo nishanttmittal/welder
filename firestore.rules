@@ -1,0 +1,39 @@
+rules_version = '2';
+// ────────────────────────────────────────────────────────────────────────────
+// Firestore rules for the "unico-operations" project (hosts MULTIPLE apps).
+// Paste in: Firebase Console → Firestore Database → Rules → Publish.
+// Keep ALL app blocks so publishing doesn't disable another app.
+//   • apps/platingjobwork/...  (Plating Job Work)
+//   • apps/fitting/...         (Fitting)
+//   • apps/welder/...          (Welder Contractor  ← this app)
+// Signed-in (anonymous/Google) read+write keeps data private to your team.
+// ────────────────────────────────────────────────────────────────────────────
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /apps/platingjobwork/{collection}/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /apps/platingjobwork {
+      allow read, write: if request.auth != null;
+    }
+
+    match /apps/fitting/{collection}/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /apps/fitting {
+      allow read, write: if request.auth != null;
+    }
+
+    match /apps/welder/{collection}/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /apps/welder {
+      allow read, write: if request.auth != null;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
