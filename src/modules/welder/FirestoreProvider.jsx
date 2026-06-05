@@ -59,9 +59,9 @@ export function FirestoreProvider({ children }) {
     return () => { clearTimeout(timer); unsub() }
   }, [])
 
-  const log = useCallback((action, detail, by = 'user') => {
+  const log = useCallback((action, detail, by = 'user', ref = '') => {
     const id = makeId('log')
-    setDoc(paths.logDoc(id), { id, ts: new Date().toISOString(), action, detail, by })
+    setDoc(paths.logDoc(id), { id, ts: new Date().toISOString(), action, detail, by, ref })
   }, [])
 
   // First-run seeding (idempotent ids).

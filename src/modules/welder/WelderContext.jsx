@@ -25,8 +25,8 @@ export function LocalWelderProvider({ children }) {
   const parties    = useCollection(partiesRepo)
   const logs       = useCollection(logsRepo)
 
-  const log = useCallback((action, detail, by = 'user') => {
-    logs.insert({ ts: new Date().toISOString(), action, detail, by })
+  const log = useCallback((action, detail, by = 'user', ref = '') => {
+    logs.insert({ ts: new Date().toISOString(), action, detail, by, ref })
   }, [logs])
 
   const value = {

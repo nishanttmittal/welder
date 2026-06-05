@@ -8,6 +8,7 @@ import { totalSent } from './logic/report'
 import { ADMIN_PASSWORD } from './config'
 import Entry from './pages/Entry'
 import Dashboard from './pages/Dashboard'
+import History from './pages/History'
 import Export from './pages/Export'
 import Admin from './pages/Admin'
 
@@ -41,6 +42,7 @@ export const welderModule = {
   pages: [
     { key: 'entry',     title: 'Material Sent', desc: 'Record material sent for finishing', icon: '➕', color: 'from-amber-600 to-amber-700', floor: true, Component: Entry },
     { key: 'dashboard', title: 'Dashboard',     desc: 'Daily totals, by welder & party',    icon: '📊', color: 'from-blue-600 to-blue-700',   Component: Dashboard },
+    { key: 'history',   title: 'History',       desc: 'Review, edit, void or delete entries', icon: '🗂️', color: 'from-amber-500 to-amber-600', Component: History },
     { key: 'export',    title: 'Export / Share', desc: 'Daily report on WhatsApp',           icon: '📄', color: 'from-violet-600 to-violet-700', Component: Export },
     { key: 'admin',     title: 'Admin',         desc: 'Products, welders, parties, backup',  icon: '⚙️', color: 'from-slate-600 to-slate-700', Component: Admin },
   ],
