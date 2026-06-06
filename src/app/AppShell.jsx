@@ -45,6 +45,7 @@ function StaffView({ module, operator, onSwitch }) {
 function Console({ module, level, onSwitch }) {
   const [activeKey, setActiveKey] = useState(null)
   const owner = level === 'owner'
+  const by = owner ? 'Owner' : (module.inchargeLabel || 'User1')
   const pages = module.pages.filter(p => (p.roles || []).includes(level))
   const view = { ...module, pages }
   const activePage = pages.find(p => p.key === activeKey)
@@ -53,7 +54,7 @@ function Console({ module, level, onSwitch }) {
       {activePage ? (
         <>
           <NavBar title={activePage.title} onHome={() => setActiveKey(null)} />
-          <activePage.Component level={level} owner={owner} />
+          <activePage.Component level={level} owner={owner} by={by} />
         </>
       ) : (
         <ModuleHome module={view} onOpen={setActiveKey} />

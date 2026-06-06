@@ -9,7 +9,7 @@ import { todayStr, daysAgoStr, fmtNum, fmtDate } from '../../../core/utils/forma
 import { useWelder } from '../WelderContext'
 import { FINISHES, finishedName, QUICK_QTYS } from '../config'
 
-export default function Entry({ floor = false, operator = '' }) {
+export default function Entry({ floor = false, operator = '', by = '' }) {
   const { dispatches, products, welders, parties, log, lastUsed } = useWelder()
   const { msg, show } = useToast()
 
@@ -40,21 +40,22 @@ export default function Entry({ floor = false, operator = '' }) {
     .filter(d => d.date === date && (!welder || d.welder === welder))
     .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
 
-  // Worker self-correction: only the most recent SAME-DAY entry, and only while
-  // still PENDING (not yet passed by the manager), can the welder fix/cancel.
-  const last = todays[0]
-  const editableId = (date === todayStr() && last && (last.status || 'pending') === 'pending') ? last.id : null
+  // No approval gate. The welder (or User1) can fix/cancel ANY of their entries
+  // for 2 days (today + 2 days back); after that only Admin can edit (History).
+  const who = by || operator || (floor ? 'welder' : 'admin')
+  const canEditDay = date >= daysAgoStr(2)
   const openFix = (d) => { setFixing(d); setFixQty(String(d.qty)) }
   const saveFix = () => {
     const v = Number(fixQty) || 0
+    const old = fixing.qty
     dispatches.update(fixing.id, { qty: v })
-    log('FIX', `${fixing.finishedName || fixing.productName}: ${fixing.qty}→${v} (welder, same-day)`, floor ? 'welder' : 'admin')
+    log('FIX', `${fixing.finishedName || fixing.productName}: ${old}→${v}`, who, fixing.id)
     show('Corrected ✓'); setFixing(null)
   }
   const cancelEntry = (d) => {
     if (!confirm(`Cancel this entry (${d.finishedName || d.productName} × ${d.qty})? It will be voided to 0.`)) return
+    log('VOID', `${d.finishedName || d.productName} × ${d.qty} → 0 (cancelled)`, who, d.id)
     dispatches.update(d.id, { qty: 0 })
-    log('VOID', `${d.finishedName || d.productName} × ${d.qty} → 0 (welder cancel)`, floor ? 'welder' : 'admin')
     show('Entry cancelled ✓')
   }
 
@@ -79,8 +80,8 @@ export default function Entry({ floor = false, operator = '' }) {
 
   const doSave = () => {
     setConfirming(false)
-    dispatches.insert({ date, welder, productName, finish, finishedName: finalName, party, qty: n, remarks: remarks.trim() })
-    log('SENT', `${welder}: ${finalName} × ${n} → ${party} on ${fmtDate(date)}`, floor ? 'welder' : 'admin')
+    const rec = dispatches.insert({ date, welder, productName, finish, finishedName: finalName, party, qty: n, remarks: remarks.trim() })
+    log('SENT', `${welder}: ${finalName} × ${n} → ${party} on ${fmtDate(date)}`, who, rec?.id)
     lastUsed.set({ ...lastUsed.get(), welder, finish, party }) // remember for next time
     show(`Saved: ${finalName} × ${fmtNum(n)} ✓`)
     setProductName(''); setQty(''); setRemarks(''); setShowNote(false); setSearch('')
@@ -188,7 +189,7 @@ export default function Entry({ floor = false, operator = '' }) {
                   </div>
                   <span className={`font-mono font-bold ${d.qty === 0 ? 'text-slate-400' : 'text-amber-700'}`}>{d.qty === 0 ? 'cancelled' : `× ${fmtNum(d.qty)}`}</span>
                 </div>
-                {d.id === editableId && d.qty > 0 && (
+                {canEditDay && d.qty > 0 && (
                   <div className="flex gap-2 mt-2">
                     <button onClick={() => openFix(d)} className="flex-1 text-xs font-bold text-blue-600 bg-blue-50 rounded-lg py-1.5">✎ Fix qty</button>
                     <button onClick={() => cancelEntry(d)} className="flex-1 text-xs font-bold text-red-600 bg-red-50 rounded-lg py-1.5">✕ Cancel</button>
