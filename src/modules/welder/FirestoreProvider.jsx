@@ -8,9 +8,9 @@ import { onSnapshot, setDoc, deleteDoc, getDocs, writeBatch } from 'firebase/fir
 import { db, paths, ensureSignedIn } from '../../core/db/firebase'
 import { makeNormalizer } from '../../core/schema/field'
 import { makeId } from '../../core/db/repository'
-import { dispatchSchema, productSchema, welderSchema, partySchema } from './schema'
+import { dispatchSchema, productSchema, welderSchema, partySchema, platingOutboxSchema } from './schema'
 import { DEFAULT_PRODUCTS, DEFAULT_WELDERS, DEFAULT_PARTIES } from './config'
-import { lastUsedStore } from './data'
+import { lastUsedStore, countersStore } from './data'
 import { WelderCtx } from './WelderContext'
 
 function useCloudCollection(collPath, docPath, normalize) {
@@ -37,6 +37,7 @@ const normDispatch = makeNormalizer(dispatchSchema)
 const normProduct  = makeNormalizer(productSchema)
 const normWelder   = makeNormalizer(welderSchema)
 const normParty    = makeNormalizer(partySchema)
+const normOutbox   = makeNormalizer(platingOutboxSchema)
 
 export function FirestoreProvider({ children }) {
   const [ready, setReady] = useState(false)
@@ -47,6 +48,7 @@ export function FirestoreProvider({ children }) {
   const products   = useCloudCollection(paths.products, paths.product, normProduct)
   const welders    = useCloudCollection(paths.welders, paths.welder, normWelder)
   const parties    = useCloudCollection(paths.parties, paths.party, normParty)
+  const platingOutbox = useCloudCollection(paths.platingOutbox, paths.platingOutboxDoc, normOutbox)
   const logs       = useCloudCollection(paths.logs, paths.logDoc, (r) => r)
 
   useEffect(() => {
@@ -93,8 +95,8 @@ export function FirestoreProvider({ children }) {
   }
 
   const value = {
-    dispatches, products, welders, parties, logs,
-    lastUsed: lastUsedStore, log,
+    dispatches, products, welders, parties, platingOutbox, logs,
+    lastUsed: lastUsedStore, counters: countersStore, log,
     cloud: { connected: !error, error },
   }
   return <WelderCtx.Provider value={value}>{children}</WelderCtx.Provider>

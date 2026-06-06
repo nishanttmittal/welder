@@ -4,7 +4,7 @@
  */
 import { createCollection, createSingleton, makeId } from '../../core/db/repository'
 import { makeNormalizer } from '../../core/schema/field'
-import { dispatchSchema, productSchema, welderSchema, partySchema } from './schema'
+import { dispatchSchema, productSchema, welderSchema, partySchema, platingOutboxSchema } from './schema'
 import { KEYS, DEFAULT_PRODUCTS, DEFAULT_WELDERS, DEFAULT_PARTIES } from './config'
 
 export const dispatchesRepo = createCollection(KEYS.dispatches, {
@@ -27,5 +27,11 @@ export const partiesRepo = createCollection(KEYS.parties, {
   normalize: makeNormalizer(partySchema),
 })
 
+export const platingOutboxRepo = createCollection(KEYS.platingOutbox, {
+  seed: () => [],
+  normalize: makeNormalizer(platingOutboxSchema),
+})
+
 export const logsRepo = createCollection(KEYS.logs, { seed: () => [] })
 export const lastUsedStore = createSingleton(KEYS.lastUsed, {})
+export const countersStore = createSingleton(KEYS.counters, {})

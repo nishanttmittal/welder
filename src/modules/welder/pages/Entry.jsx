@@ -24,6 +24,7 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
   // Remember the welder's last finish + destination so repeat sends are fast.
   const [finish, setFinish] = useState(remembered.finish || 'chrome')
   const [party, setParty] = useState(remembered.party || '')
+  const [gaadi, setGaadi] = useState(remembered.gaadi || '')
   const [qty, setQty] = useState('')
   const [remarks, setRemarks] = useState('')
   const [showNote, setShowNote] = useState(false)
@@ -80,10 +81,11 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
 
   const doSave = () => {
     setConfirming(false)
-    const rec = dispatches.insert({ date, welder, productName, finish, finishedName: finalName, party, qty: n, remarks: remarks.trim() })
+    const rec = dispatches.insert({ date, welder, productName, finish, finishedName: finalName, party, qty: n, gaadi: gaadi.trim(), remarks: remarks.trim() })
     log('SENT', `${welder}: ${finalName} × ${n} → ${party} on ${fmtDate(date)}`, who, rec?.id)
-    lastUsed.set({ ...lastUsed.get(), welder, finish, party }) // remember for next time
+    lastUsed.set({ ...lastUsed.get(), welder, finish, party, gaadi: gaadi.trim() }) // remember for next time
     show(`Saved: ${finalName} × ${fmtNum(n)} ✓`)
+    // keep gaadi (same vehicle carries several products); clear the rest
     setProductName(''); setQty(''); setRemarks(''); setShowNote(false); setSearch('')
   }
 
@@ -150,6 +152,11 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
             <FieldLabel>Sent to</FieldLabel>
             <Select className="mt-1.5" value={party} onChange={e => setParty(e.target.value)}
               options={[{ value: '', label: '— select —' }, ...parties.list.map(p => ({ value: p.name, label: p.name }))]} />
+          </div>
+
+          <div>
+            <FieldLabel>Gaadi No <span className="text-slate-400 font-normal normal-case">(vehicle — for plating dispatch)</span></FieldLabel>
+            <TextInput className="mt-1.5" placeholder="e.g. HR55 1234" value={gaadi} onChange={e => setGaadi(e.target.value)} />
           </div>
 
           <div>

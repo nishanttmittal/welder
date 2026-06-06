@@ -27,9 +27,11 @@ function BottomBar({ label, onSwitch }) {
 }
 
 function StaffView({ module, operator, onSwitch }) {
-  const page = module.pages.find(p => p.key === module.floorPageKey) || module.pages[0]
+  const floorPages = module.pages.filter(p => p.floor)
+  const [activeKey, setActiveKey] = useState(module.floorPageKey || floorPages[0]?.key)
+  const page = floorPages.find(p => p.key === activeKey) || floorPages[0]
   return (
-    <div className="min-h-screen bg-slate-50 pb-16">
+    <div className="min-h-screen bg-slate-50 pb-28">
       <header className="bg-gradient-to-r from-amber-600 to-amber-700 text-white px-5 no-print" style={{ paddingTop: 'calc(0.9rem + env(safe-area-inset-top))', paddingBottom: '0.9rem' }}>
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <div className="w-9 h-9 bg-white/15 rounded-xl flex items-center justify-center text-lg">{module.icon}</div>
@@ -37,6 +39,17 @@ function StaffView({ module, operator, onSwitch }) {
         </div>
       </header>
       <page.Component floor operator={operator} />
+      {/* Floor tabs (Add / Dispatch) sit just above the bottom bar — reachable. */}
+      {floorPages.length > 1 && (
+        <div className="fixed inset-x-0 z-30 bg-white border-t border-slate-200 flex no-print" style={{ bottom: 'calc(2.4rem + env(safe-area-inset-bottom))' }}>
+          {floorPages.map(p => (
+            <button key={p.key} onClick={() => setActiveKey(p.key)}
+              className={`flex-1 py-2.5 text-sm font-bold ${activeKey === p.key ? 'text-amber-600 border-t-2 border-amber-500 -mt-px' : 'text-slate-400'}`}>
+              {p.icon} {p.floorTab || p.title}
+            </button>
+          ))}
+        </div>
+      )}
       {onSwitch && <BottomBar label={`Welder${operator ? ' · ' + operator : ''}`} onSwitch={onSwitch} />}
     </div>
   )

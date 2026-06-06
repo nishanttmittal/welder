@@ -57,11 +57,21 @@ export const DEFAULT_PRODUCTS = [
   'Vista', 'Mona', '1" Frame', '1.25" Frame', 'Burfi',
 ]
 
+/** Finishes that are PLATING (flow to the Plating Job Work app). Powder is
+ *  in-house powder coating — it does NOT go to plating. */
+export const PLATING_FINISHES = ['chrome', 'gold', 'rosegold']
+export const isPlatingFinish = (key) => PLATING_FINISHES.includes(key)
+
+/** Welder challan prefix from the welder's name, e.g. "Naveen" → "NAV". */
+export const welderPrefix = (name) => ((name || '').replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase() || 'WLD')
+
 export const KEYS = {
-  dispatches: 'dispatches',
-  products:   'products',
-  welders:    'welders',
-  parties:    'parties',
-  logs:       'logs',
-  lastUsed:   'last_used',
+  dispatches:   'dispatches',
+  products:     'products',
+  welders:      'welders',
+  parties:      'parties',
+  logs:         'logs',
+  lastUsed:     'last_used',
+  platingOutbox: 'plating_outbox',
+  counters:     'counters', // { challan: { Naveen: 3, Jitender: 1 } }
 }

@@ -51,6 +51,22 @@ export const paths = {
   party: (id) => cdoc('parties', id),
   logs: () => coll('logs'),
   logDoc: (id) => cdoc('logs', id),
+  platingOutbox: () => coll('plating_outbox'),
+  platingOutboxDoc: (id) => cdoc('plating_outbox', id),
+  counters: () => doc(db, 'apps', APP_NS, 'meta', 'counters'),
+}
+
+/**
+ * Cross-app bridge to the Plating Job Work app (apps/platingjobwork) — used to
+ * push welder challans into the plating app. SAME Firestore project, different
+ * namespace. The plating app's UI is never modified; we only write data it
+ * already understands (challans + its atomic challan-number counter).
+ */
+export const platingPaths = db && {
+  challans: () => collection(db, 'apps', 'platingjobwork', 'challans'),
+  challan: (id) => doc(db, 'apps', 'platingjobwork', 'challans', id),
+  counter: () => doc(db, 'apps', 'platingjobwork', 'meta', 'counter'),
+  parties: () => doc(db, 'apps', 'platingjobwork', 'meta', 'parties'),
 }
 
 export function ensureSignedIn() {

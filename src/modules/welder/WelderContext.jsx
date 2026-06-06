@@ -5,7 +5,7 @@
  */
 import { createContext, useContext, useCallback } from 'react'
 import { useCollection } from '../../core/hooks/useCollection'
-import { dispatchesRepo, productsRepo, weldersRepo, partiesRepo, logsRepo, lastUsedStore } from './data'
+import { dispatchesRepo, productsRepo, weldersRepo, partiesRepo, logsRepo, lastUsedStore, platingOutboxRepo, countersStore } from './data'
 import { isFirebaseConfigured } from '../../core/db/firebaseConfig'
 import { FirestoreProvider } from './FirestoreProvider'
 
@@ -23,6 +23,7 @@ export function LocalWelderProvider({ children }) {
   const products   = useCollection(productsRepo)
   const welders    = useCollection(weldersRepo)
   const parties    = useCollection(partiesRepo)
+  const platingOutbox = useCollection(platingOutboxRepo)
   const logs       = useCollection(logsRepo)
 
   const log = useCallback((action, detail, by = 'user', ref = '') => {
@@ -30,8 +31,8 @@ export function LocalWelderProvider({ children }) {
   }, [logs])
 
   const value = {
-    dispatches, products, welders, parties, logs,
-    lastUsed: lastUsedStore, log,
+    dispatches, products, welders, parties, platingOutbox, logs,
+    lastUsed: lastUsedStore, counters: countersStore, log,
     cloud: { connected: false, error: '' },
   }
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
