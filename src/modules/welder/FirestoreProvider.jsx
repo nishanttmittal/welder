@@ -8,7 +8,7 @@ import { onSnapshot, setDoc, deleteDoc, getDocs, writeBatch } from 'firebase/fir
 import { db, paths, ensureSignedIn } from '../../core/db/firebase'
 import { makeNormalizer } from '../../core/schema/field'
 import { makeId } from '../../core/db/repository'
-import { dispatchSchema, productSchema, welderSchema, partySchema, platingOutboxSchema } from './schema'
+import { dispatchSchema, productSchema, welderSchema, partySchema, platingOutboxSchema, rateSchema, paymentSchema, ledgerSchema, userSchema } from './schema'
 import { DEFAULT_PRODUCTS, DEFAULT_WELDERS, DEFAULT_PARTIES } from './config'
 import { lastUsedStore, countersStore } from './data'
 import { WelderCtx } from './WelderContext'
@@ -21,8 +21,8 @@ function useCloudCollection(collPath, docPath, normalize) {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
   return {
     list,
-    insert: (rec) => { const id = rec.id || makeId('r'); const row = { createdAt: new Date().toISOString(), ...rec, id }; setDoc(docPath(id), row); return row },
-    update: (id, patch) => setDoc(docPath(id), patch, { merge: true }),
+    insert: (rec) => { const id = rec.id || makeId('r'); const now = new Date().toISOString(); const row = { createdAt: now, updatedAt: now, ...rec, id }; setDoc(docPath(id), row); return row },
+    update: (id, patch) => setDoc(docPath(id), { ...patch, updatedAt: new Date().toISOString() }, { merge: true }),
     remove: (id) => deleteDoc(docPath(id)),
     removeWhere: (pred) => { const hit = list.filter(pred); const b = writeBatch(db); hit.forEach(r => b.delete(docPath(r.id))); b.commit(); return hit.length },
     replaceAll: async (rows) => {
@@ -38,6 +38,10 @@ const normProduct  = makeNormalizer(productSchema)
 const normWelder   = makeNormalizer(welderSchema)
 const normParty    = makeNormalizer(partySchema)
 const normOutbox   = makeNormalizer(platingOutboxSchema)
+const normRate     = makeNormalizer(rateSchema)
+const normPayment  = makeNormalizer(paymentSchema)
+const normLedger   = makeNormalizer(ledgerSchema)
+const normUser     = makeNormalizer(userSchema)
 
 export function FirestoreProvider({ children }) {
   const [ready, setReady] = useState(false)
@@ -49,6 +53,10 @@ export function FirestoreProvider({ children }) {
   const welders    = useCloudCollection(paths.welders, paths.welder, normWelder)
   const parties    = useCloudCollection(paths.parties, paths.party, normParty)
   const platingOutbox = useCloudCollection(paths.platingOutbox, paths.platingOutboxDoc, normOutbox)
+  const rates      = useCloudCollection(paths.rates, paths.rate, normRate)
+  const payments   = useCloudCollection(paths.payments, paths.payment, normPayment)
+  const ledger     = useCloudCollection(paths.ledger, paths.ledgerDoc, normLedger)
+  const users      = useCloudCollection(paths.users, paths.user, normUser)
   const logs       = useCloudCollection(paths.logs, paths.logDoc, (r) => r)
 
   useEffect(() => {
@@ -95,7 +103,7 @@ export function FirestoreProvider({ children }) {
   }
 
   const value = {
-    dispatches, products, welders, parties, platingOutbox, logs,
+    dispatches, products, welders, parties, platingOutbox, rates, payments, ledger, users, logs,
     lastUsed: lastUsedStore, counters: countersStore, log,
     cloud: { connected: !error, error },
   }

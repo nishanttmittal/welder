@@ -59,21 +59,24 @@ export function createCollection(key, opts = {}) {
       return read().filter(predicate)
     },
 
-    /** Insert a new record; auto-assigns `id` and `createdAt` if absent. */
+    /** Insert a new record; auto-assigns `id`, `createdAt` and `updatedAt` if absent. */
     insert(record) {
       const list = read()
+      const now = new Date().toISOString()
       const row = {
         id: record.id ?? makeId(),
-        createdAt: record.createdAt ?? new Date().toISOString(),
+        createdAt: record.createdAt ?? now,
+        updatedAt: record.updatedAt ?? now,
         ...record,
       }
       write([...list, row])
       return row
     },
 
-    /** Patch an existing record by id with a partial object. */
+    /** Patch an existing record by id with a partial object (auto-stamps updatedAt). */
     update(id, patch) {
-      write(read().map(r => (r.id === id ? { ...r, ...patch } : r)))
+      const now = new Date().toISOString()
+      write(read().map(r => (r.id === id ? { ...r, ...patch, updatedAt: now } : r)))
     },
 
     /** Delete one record by id. */

@@ -54,6 +54,14 @@ export const paths = {
   platingOutbox: () => coll('plating_outbox'),
   platingOutboxDoc: (id) => cdoc('plating_outbox', id),
   counters: () => doc(db, 'apps', APP_NS, 'meta', 'counters'),
+  rates: () => coll('rates'),
+  rate: (id) => cdoc('rates', id),
+  payments: () => coll('payments'),
+  payment: (id) => cdoc('payments', id),
+  ledger: () => coll('ledger'),
+  ledgerDoc: (id) => cdoc('ledger', id),
+  users: () => coll('users'),
+  user: (id) => cdoc('users', id),
 }
 
 /**
@@ -75,6 +83,36 @@ export function ensureSignedIn() {
     const unsub = onAuthStateChanged(auth, (user) => { if (user) { unsub(); resolve(user.uid) } })
     signInAnonymously(auth).catch(reject)
   })
+}
+
+/**
+ * Sign the MAIN session in with Google (Manager/Owner). This replaces the
+ * anonymous session so Firestore rules can see request.auth.token.email and
+ * enforce roles. On iPhone Safari, popups can be blocked — we fall back to a
+ * full-page redirect automatically.
+ */
+export async function signInWithGoogle() {
+  if (!auth) throw new Error('Cloud not configured')
+  const provider = new GoogleAuthProvider()
+  provider.setCustomParameters({ prompt: 'select_account' })
+  try {
+    return await signInWithPopup(auth, provider)
+  } catch (e) {
+    if (e?.code === 'auth/popup-blocked' || e?.code === 'auth/cancelled-popup-request' || e?.code === 'auth/operation-not-supported-in-this-environment') {
+      const { signInWithRedirect } = await import('firebase/auth')
+      return signInWithRedirect(auth, provider)
+    }
+    throw e
+  }
+}
+
+/** Sign out the current user (returns to the Google sign-in screen). */
+export function signOutUser() { return auth ? auth.signOut() : Promise.resolve() }
+
+/** Subscribe to auth state. Calls cb(user|null); user.isAnonymous distinguishes welders. */
+export function watchAuth(cb) {
+  if (!auth) { cb(null); return () => {} }
+  return onAuthStateChanged(auth, cb)
 }
 
 /** Google identity check for unlocking Admin (isolated secondary app). */

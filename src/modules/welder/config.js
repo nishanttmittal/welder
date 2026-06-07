@@ -4,7 +4,28 @@
 
 export const APP_TITLE = 'Welder Contractor'
 
-/** Owner — full access incl. approve/edit/delete + log. */
+/**
+ * Identity of this app on the shared UNICO factory data-backbone. These tag
+ * every record so future apps (laser/plating/powder/assembly/packing/dispatch,
+ * multi-factory, ERP dashboard) can link to welder data with NO schema redesign.
+ * Single factory for now → DEFAULT_FACTORY_ID 'main'.
+ */
+export const SOURCE_APP = 'welder'
+export const WORKFLOW_STAGE = 'welding'
+export const DEFAULT_FACTORY_ID = 'main'
+
+/**
+ * REAL AUTH (Google sign-in for Manager/Owner; welders stay link-based/anonymous).
+ * Roles are managed in-app (Admin → Users & Access), stored at apps/welder/users
+ * keyed by email. These bootstrap emails are ALWAYS owner so you can never lock
+ * yourself out — add/replace with your own Google account, then manage the rest
+ * in-app. Must be lowercase. Mirror this list in firestore.rules.
+ */
+export const OWNER_EMAILS = ['nspenterprises24@gmail.com']
+export const ROLES = { owner: 'owner', manager: 'manager' }
+
+/** Owner — full access incl. approve/edit/delete + log. (Legacy password — used
+ *  only in offline/local `?local=1` mode; cloud mode uses Google auth.) */
 export const ADMIN_PASSWORD = '6133923_N'
 /** Second role (reviews & passes entries) — label is just a display name,
  *  change to anything you like. Password: nsp@123. */
@@ -21,6 +42,9 @@ export const statusColor = (s) => ({ pending: 'bg-slate-100 text-slate-600', pas
 
 /** Quick-add chips on the quantity stepper. */
 export const QUICK_QTYS = [5, 10, 25, 50, 100, 200]
+
+/** Payment modes for contractor payments. */
+export const PAYMENT_MODES = ['Cash', 'UPI', 'Cheque', 'Bank Transfer']
 
 /**
  * Finishes a welded product can be sent for. The finish is appended AFTER the
@@ -39,6 +63,22 @@ export const finishedName = (base, finishKey) => {
   const f = FINISHES.find(x => x.key === finishKey)
   return f ? `${base} ${f.suffix}` : base
 }
+
+/**
+ * Contractor processes for piece-rate pay. 'welding' is what this app records
+ * today; the rest future-proof the rate sheet so the SAME pay screen scales to
+ * plating, powder, assembly, packing and dispatch contractors later (a rate set
+ * now is simply waiting for those apps to feed production into it).
+ */
+export const PROCESSES = [
+  { key: 'welding',  label: 'Welding' },
+  { key: 'plating',  label: 'Plating' },
+  { key: 'powder',   label: 'Powder Coating' },
+  { key: 'assembly', label: 'Assembly' },
+  { key: 'packing',  label: 'Packing' },
+  { key: 'dispatch', label: 'Dispatch' },
+]
+export const processLabel = (k) => PROCESSES.find(p => p.key === k)?.label || k
 
 /** Contractors (welders) who use the app — editable in admin. */
 export const DEFAULT_WELDERS = ['Naveen', 'Jitender']
@@ -74,4 +114,8 @@ export const KEYS = {
   lastUsed:     'last_used',
   platingOutbox: 'plating_outbox',
   counters:     'counters', // { challan: { Naveen: 3, Jitender: 1 } }
+  rates:        'rates',
+  payments:     'payments',
+  ledger:       'ledger',
+  users:        'users',
 }

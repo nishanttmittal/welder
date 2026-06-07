@@ -9,19 +9,21 @@
 import { useState } from 'react'
 import { getModule } from '../modules/registry'
 import { PasswordGate } from '../core/ui'
+import { isFirebaseConfigured } from '../core/db/firebaseConfig'
 import ModuleHome from './ModuleHome'
 import NavBar from './NavBar'
 import RoleChooser from './RoleChooser'
+import AuthGate from './AuthGate'
 
 const ROLE_KEY = 'wld:role'
 
 /** Bottom-fixed bar — reachable on phones, away from the top status area. */
-function BottomBar({ label, onSwitch }) {
+function BottomBar({ label, onSwitch, switchLabel = 'Switch' }) {
   return (
     <div className="fixed bottom-0 inset-x-0 bg-slate-900 text-slate-300 px-4 flex items-center justify-between text-xs no-print z-30"
       style={{ paddingTop: '0.6rem', paddingBottom: 'calc(0.6rem + env(safe-area-inset-bottom))' }}>
       <span className="font-semibold tracking-wide uppercase truncate">{label}</span>
-      {onSwitch && <button onClick={onSwitch} className="flex items-center gap-1 bg-white/15 rounded-lg px-3 py-1.5 font-bold flex-shrink-0">⇄ Switch</button>}
+      {onSwitch && <button onClick={onSwitch} className="flex items-center gap-1 bg-white/15 rounded-lg px-3 py-1.5 font-bold flex-shrink-0">⇄ {switchLabel}</button>}
     </div>
   )
 }
@@ -55,13 +57,14 @@ function StaffView({ module, operator, onSwitch }) {
   )
 }
 
-function Console({ module, level, onSwitch }) {
+function Console({ module, level, onSwitch, userEmail }) {
   const [activeKey, setActiveKey] = useState(null)
   const owner = level === 'owner'
   const by = owner ? 'Owner' : (module.inchargeLabel || 'User1')
   const pages = module.pages.filter(p => (p.roles || []).includes(level))
   const view = { ...module, pages }
   const activePage = pages.find(p => p.key === activeKey)
+  const roleLabel = owner ? 'Owner' : (module.inchargeLabel || 'In-Charge')
   return (
     <div className="min-h-screen bg-slate-50 pb-16">
       {activePage ? (
@@ -72,7 +75,7 @@ function Console({ module, level, onSwitch }) {
       ) : (
         <ModuleHome module={view} onOpen={setActiveKey} />
       )}
-      <BottomBar label={owner ? 'Owner' : (module.inchargeLabel || 'In-Charge')} onSwitch={onSwitch} />
+      <BottomBar label={userEmail ? `${roleLabel} · ${userEmail}` : roleLabel} onSwitch={onSwitch} switchLabel={userEmail ? 'Sign out' : 'Switch'} />
     </div>
   )
 }
@@ -92,8 +95,22 @@ export default function AppShell({ moduleId }) {
 
   if (staffLock) return <Provider><StaffView module={module} operator={who} /></Provider>
 
-  const effective = normParam === 'incharge' || normParam === 'owner' ? normParam : role
+  // CLOUD MODE: real authentication — Google sign-in + role from the users list.
+  // Welders never reach here (they use the staff link above).
+  if (isFirebaseConfigured) {
+    return (
+      <Provider>
+        <AuthGate title={module.title} icon={module.icon}>
+          {({ role, email, signOut }) => (
+            <Console module={module} level={role === 'owner' ? 'owner' : 'incharge'} onSwitch={signOut} userEmail={email} />
+          )}
+        </AuthGate>
+      </Provider>
+    )
+  }
 
+  // LOCAL / OFFLINE MODE (?local=1): legacy password chooser for testing only.
+  const effective = normParam === 'incharge' || normParam === 'owner' ? normParam : role
   return (
     <Provider>
       {!effective && <RoleChooser title={module.title} icon={module.icon} inchargeLabel={module.inchargeLabel} onPick={pick} />}

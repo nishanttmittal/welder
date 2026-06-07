@@ -8,6 +8,8 @@ import { totalSent } from './logic/report'
 import { ADMIN_PASSWORD, MANAGER_PASSWORD, INCHARGE_LABEL } from './config'
 import Entry from './pages/Entry'
 import PlatingOutbox from './pages/PlatingOutbox'
+import ContractorPay from './pages/ContractorPay'
+import Ledger from './pages/Ledger'
 import Dashboard from './pages/Dashboard'
 import History from './pages/History'
 import Export from './pages/Export'
@@ -48,6 +50,8 @@ export const welderModule = {
   pages: [
     { key: 'entry',     title: 'Material Sent',  desc: 'Gaadi + add products → save',           icon: '➕', color: 'from-amber-600 to-amber-700', floor: true, roles: ['incharge', 'owner'], Component: Entry },
     { key: 'history',   title: 'Entries',        desc: 'View & edit entries (2-day window)',    icon: '🗂️', color: 'from-amber-500 to-amber-600', roles: ['incharge', 'owner'], Component: History },
+    { key: 'pay',       title: 'Contractor Pay', desc: 'Piece-rate earnings & statements',      icon: '💰', color: 'from-emerald-600 to-emerald-700', roles: ['incharge', 'owner'], Component: ContractorPay },
+    { key: 'ledger',    title: 'Contractor Ledger', desc: 'Running balance, advances, settlement', icon: '📒', color: 'from-teal-600 to-teal-700', roles: ['incharge', 'owner'], Component: Ledger },
     { key: 'outbox',    title: 'Plating Outbox', desc: 'Challans ready for the Plating app',    icon: '📤', color: 'from-blue-600 to-blue-700',   roles: ['owner'], Component: PlatingOutbox },
     { key: 'dashboard', title: 'Dashboard',      desc: 'Daily totals, by welder & party',      icon: '📊', color: 'from-blue-600 to-blue-700',   roles: ['owner'], Component: Dashboard },
     { key: 'export',    title: 'Export / Share', desc: 'Daily PDF report for WhatsApp',         icon: '📄', color: 'from-violet-600 to-violet-700', roles: ['owner'], Component: Export },

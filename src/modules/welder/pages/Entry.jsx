@@ -5,12 +5,13 @@
  * AND auto-generates the combined plating challan (no separate dispatch step).
  * Welders only PICK products from the list; only the owner can add products.
  */
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import { Button, Card, FieldLabel, Select, NumberInput, TextInput, useToast, Toast } from '../../../core/ui'
 import { todayStr, daysAgoStr, fmtNum, fmtDate } from '../../../core/utils/format'
 import { useWelder } from '../WelderContext'
-import { FINISHES, finishedName, isPlatingFinish } from '../config'
+import { FINISHES, finishedName, isPlatingFinish, SOURCE_APP, WORKFLOW_STAGE, DEFAULT_FACTORY_ID } from '../config'
 import { nextWelderChallan, last4 } from '../logic/platingBridge'
+import { makeId } from '../../../core/db/repository'
 
 export default function Entry({ floor = false, operator = '', by = '' }) {
   const { dispatches, products, welders, parties, platingOutbox, counters, log, lastUsed } = useWelder()
@@ -24,6 +25,8 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
   const [gaadi, setGaadi] = useState('')
   const [items, setItems] = useState([{ product: '', qty: '' }, { product: '', qty: '' }, { product: '', qty: '' }])
   const [confirming, setConfirming] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false) // hard guard against a fast double-tap on Save
   const [fixing, setFixing] = useState(null)
   const [fixQty, setFixQty] = useState('')
 
@@ -68,22 +71,37 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
     if (!party) return show('Pick where it is sent', 2000)
     if (plating && !gaadi.trim()) return show('Enter the gaadi (vehicle) number', 2500)
     if (filled.length === 0) return show('Add at least one product + quantity', 2500)
+    savingRef.current = false; setSaving(false) // fresh attempt
     setConfirming(true)
   }
 
   const doSave = () => {
+    if (savingRef.current) return // already saving this challan — ignore double-tap
+    savingRef.current = true; setSaving(true)
     setConfirming(false)
-    // Welder challan number (NAV-001) — one per gaadi, only for plating finishes.
-    let code = ''
-    if (plating && gaadi.trim()) {
-      const r = nextWelderChallan(counters.get(), welder); code = r.code
-      const cur = counters.get() || {}
-      counters.set({ ...cur, challan: { ...(cur.challan || {}), [welder]: r.n } })
-    }
+    // EVERY dispatch gets its own welder challan number (NAV-001) — chrome, gold,
+    // rose, powder, or any future finish. (Only plating finishes also flow to the
+    // plating app below.) The number is derived from synced data so it stays
+    // unique across phones and survives a crash.
+    const r = nextWelderChallan(counters.get(), welder, dispatches.list)
+    const code = r.code
+    const cur = counters.get() || {}
+    counters.set({ ...cur, challan: { ...(cur.challan || {}), [welder]: r.n } })
+    // Future-compat values (hidden, optional) computed once for this save.
+    const batchId = makeId('batch')                                  // groups this gaadi-load's lines
+    const productIdByName = Object.fromEntries(products.list.map(p => [p.name, p.id]))
+    const destinationApp = isPlatingFinish(finish) ? 'platingjobwork' : '' // powder = in-house, no destination
+    const createdByRole = floor ? 'welder' : (by === 'Owner' ? 'owner' : 'incharge')
+    const stamp = new Date().toISOString()
     filled.forEach(it => {
       dispatches.insert({
         date, welder, productName: it.product, finish, finishedName: finishedName(it.product, finish),
-        party, qty: Number(it.qty), gaadi: gaadi.trim(), welderChallan: code, dispatched: !!code,
+        party, qty: Number(it.qty), gaadi: gaadi.trim(), welderChallan: code, dispatched: true,
+        // future-compatibility (hidden; auto-filled where known)
+        batchId, productId: productIdByName[it.product] || '',
+        workflowStage: WORKFLOW_STAGE, sourceApp: SOURCE_APP, destinationApp,
+        linkedChallanId: code, parentTransactionId: '',
+        createdByRole, updatedAt: stamp, factoryId: DEFAULT_FACTORY_ID,
       })
     })
     // Combined plating challan into the Outbox (same gaadi+party+date merges).
@@ -209,8 +227,8 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
             </div>
             {plating && gaadi.trim() && <p className="text-xs text-blue-600">→ also generates the plating challan for {party}.</p>}
             <div className="flex gap-3">
-              <Button variant="ghost" className="flex-1" onClick={() => setConfirming(false)}>Cancel</Button>
-              <Button variant="success" className="flex-1" onClick={doSave}>Yes, Save</Button>
+              <Button variant="ghost" className="flex-1" onClick={() => setConfirming(false)} disabled={saving}>Cancel</Button>
+              <Button variant="success" className="flex-1" onClick={doSave} disabled={saving}>{saving ? 'Saving…' : 'Yes, Save'}</Button>
             </div>
           </Card>
         </div>

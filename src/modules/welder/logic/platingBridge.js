@@ -10,11 +10,28 @@
  */
 import { welderPrefix } from '../config'
 
-/** Next welder challan code for a welder, from the counters singleton value. */
-export function nextWelderChallan(countersValue, welderName) {
-  const map = (countersValue && countersValue.challan) || {}
-  const n = (map[welderName] || 0) + 1
-  return { code: `${welderPrefix(welderName)}-${String(n).padStart(3, '0')}`, n }
+/**
+ * Next welder challan code for a welder (e.g. NAV-001) — CRASH-SAFE.
+ *
+ * Instead of trusting a single mutable counter (which lived per-device and could
+ * desync or duplicate), we take the HIGHEST number this welder has actually used
+ * in the synced dispatches list and add 1. Because dispatches sync across phones
+ * in real time, two devices online stay consistent; offline still works.
+ *
+ * The legacy `countersValue` is kept only as a floor so rapid same-session saves
+ * (before the new dispatch round-trips through the cloud snapshot) still advance.
+ */
+export function nextWelderChallan(countersValue, welderName, dispatches = []) {
+  const prefix = welderPrefix(welderName)
+  let maxN = 0
+  for (const d of dispatches) {
+    if (d.welder !== welderName) continue
+    const m = /^(.+)-(\d+)$/.exec(d.welderChallan || '')
+    if (m && m[1] === prefix) maxN = Math.max(maxN, Number(m[2]) || 0)
+  }
+  const counterN = ((countersValue && countersValue.challan) || {})[welderName] || 0
+  const n = Math.max(maxN, counterN) + 1
+  return { code: `${prefix}-${String(n).padStart(3, '0')}`, n }
 }
 
 /** Group undispatched entries by gaadi + party + date (one plating challan each). */

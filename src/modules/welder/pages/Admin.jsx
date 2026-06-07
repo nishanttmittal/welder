@@ -4,8 +4,9 @@
  * automatically (the finish is applied at entry time).
  */
 import { useRef, useState } from 'react'
-import { Button, Card, FieldLabel, TextInput, useToast, Toast } from '../../../core/ui'
+import { Button, Card, FieldLabel, TextInput, Select, useToast, Toast } from '../../../core/ui'
 import { useWelder } from '../WelderContext'
+import { OWNER_EMAILS } from '../config'
 
 /** Reusable add/list/delete for a simple {name} collection. */
 function ManageList({ title, repo, hint, log, logKey }) {
@@ -101,10 +102,60 @@ function Logs() {
   )
 }
 
+/** Users & Access — owner manages who can sign in as Manager/Owner (Google auth). */
+function ManageUsers() {
+  const { users, log } = useWelder()
+  const { msg, show } = useToast()
+  const [email, setEmail] = useState('')
+  const [name, setName] = useState('')
+  const [role, setRole] = useState('manager')
+  const add = () => {
+    const e = email.trim().toLowerCase()
+    if (!e.includes('@')) return show('Enter a valid email', 2000)
+    if (users.list.some(u => (u.email || '').toLowerCase() === e)) return show('Already added', 2000)
+    users.insert({ id: e, email: e, name: name.trim(), role, active: true })
+    log('USER_ADD', `${e} as ${role}`, 'owner'); show('User added ✓'); setEmail(''); setName('')
+  }
+  const toggleActive = (u) => { const on = u.active !== false; users.update(u.id, { active: !on }); log(on ? 'USER_OFF' : 'USER_ON', u.email, 'owner') }
+  const setRoleFor = (u, r) => { users.update(u.id, { role: r }); log('USER_ROLE', `${u.email} → ${r}`, 'owner') }
+  const remove = (u) => { if (confirm(`Remove ${u.email}? They lose access.`)) { users.remove(u.id); log('USER_DEL', u.email, 'owner') } }
+  return (
+    <Card className="p-5 space-y-3">
+      <Toast msg={msg} />
+      <FieldLabel>Users &amp; Access ({users.list.length})</FieldLabel>
+      <p className="text-xs text-slate-400 -mt-1">Managers/Owners sign in with Google. Add their Google email and role. Welders don’t need accounts.</p>
+      {OWNER_EMAILS.length > 0 && <p className="text-[11px] text-emerald-600">Built-in owner (always allowed): {OWNER_EMAILS.join(', ')}</p>}
+      <div className="space-y-2">
+        <TextInput placeholder="email@gmail.com" value={email} onChange={e => setEmail(e.target.value)} />
+        <div className="flex gap-2">
+          <TextInput placeholder="Name (optional)" value={name} onChange={e => setName(e.target.value)} />
+          <Select value={role} onChange={e => setRole(e.target.value)} options={[{ value: 'manager', label: 'Manager' }, { value: 'owner', label: 'Owner' }]} />
+          <Button variant="primary" onClick={add}>Add</Button>
+        </div>
+      </div>
+      <div className="space-y-2">
+        {users.list.length === 0 && <p className="text-sm text-slate-400">No users added yet.</p>}
+        {[...users.list].sort((a, b) => (a.email || '').localeCompare(b.email || '')).map(u => (
+          <div key={u.id} className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2">
+            <div className="flex-1 min-w-0">
+              <div className={`text-sm font-semibold truncate ${u.active === false ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{u.name || u.email}</div>
+              <div className="text-[11px] text-slate-400 truncate">{u.email}</div>
+            </div>
+            <Select className="!py-1.5 text-xs" value={u.role || 'manager'} onChange={e => setRoleFor(u, e.target.value)} options={[{ value: 'manager', label: 'Manager' }, { value: 'owner', label: 'Owner' }]} />
+            <button onClick={() => toggleActive(u)} className={`text-xs font-bold px-2 py-1 rounded-lg ${u.active === false ? 'bg-slate-200 text-slate-500' : 'bg-emerald-100 text-emerald-700'}`}>{u.active === false ? 'Off' : 'On'}</button>
+            <button onClick={() => remove(u)} className="text-red-500 font-bold px-1">✕</button>
+          </div>
+        ))}
+      </div>
+    </Card>
+  )
+}
+
 export default function Admin() {
   const { products, welders, parties, log } = useWelder()
   return (
     <div className="max-w-lg mx-auto p-4 space-y-4">
+      <ManageUsers />
       <ManageList title="Products" repo={products} log={log} logKey="PRODUCT" hint="Each product is auto-available in all finishes (Chrome/Powder/Gold/Rose Gold)." />
       <ManageList title="Welders" repo={welders} log={log} logKey="WELDER" />
       <ManageList title="Parties" repo={parties} log={log} logKey="PARTY" hint="Where material is sent: job-work persons / departments." />
