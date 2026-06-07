@@ -24,13 +24,12 @@ export const DEFAULT_FACTORY_ID = 'main'
 export const OWNER_EMAILS = ['nspenterprises24@gmail.com']
 export const ROLES = { owner: 'owner', manager: 'manager' }
 
-/** Owner — full access incl. approve/edit/delete + log. (Legacy password — used
- *  only in offline/local `?local=1` mode; cloud mode uses Google auth.) */
-export const ADMIN_PASSWORD = '6133923_N'
-/** Second role (reviews & passes entries) — label is just a display name,
- *  change to anything you like. Password: nsp@123. */
-export const INCHARGE_LABEL = 'User1'
-export const MANAGER_PASSWORD = 'nsp@123'
+/** Display name for the manager/in-charge role. */
+export const INCHARGE_LABEL = 'Manager'
+
+/** Wrong-entry correction window: Manager + Owner may correct an entry within
+ *  this many hours of creation; after that, corrections are Owner-only. */
+export const EDIT_WINDOW_HOURS = 48
 
 /**
  * Entry lifecycle (approval flow): staff creates → pending; manager → passed;

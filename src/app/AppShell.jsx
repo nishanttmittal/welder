@@ -8,7 +8,6 @@
  */
 import { useState } from 'react'
 import { getModule } from '../modules/registry'
-import { PasswordGate } from '../core/ui'
 import { isFirebaseConfigured } from '../core/db/firebaseConfig'
 import ModuleHome from './ModuleHome'
 import NavBar from './NavBar'
@@ -109,21 +108,14 @@ export default function AppShell({ moduleId }) {
     )
   }
 
-  // LOCAL / OFFLINE MODE (?local=1): legacy password chooser for testing only.
+  // LOCAL / OFFLINE MODE (?local=1): no-password role chooser, for OFFLINE TESTING
+  // ONLY (no cloud data). Production always runs the Google AuthGate branch above.
   const effective = normParam === 'incharge' || normParam === 'owner' ? normParam : role
   return (
     <Provider>
       {!effective && <RoleChooser title={module.title} icon={module.icon} inchargeLabel={module.inchargeLabel} onPick={pick} />}
-      {effective === 'incharge' && (
-        <PasswordGate password={[module.managerPassword, module.adminPassword]} title={`${module.inchargeLabel || 'In-Charge'} — Login`}>
-          <Console module={module} level="incharge" onSwitch={roleParam ? null : reset} />
-        </PasswordGate>
-      )}
-      {effective === 'owner' && (
-        <PasswordGate password={module.adminPassword} title="Owner — Login">
-          <Console module={module} level="owner" onSwitch={roleParam ? null : reset} />
-        </PasswordGate>
-      )}
+      {effective === 'incharge' && <Console module={module} level="incharge" onSwitch={roleParam ? null : reset} />}
+      {effective === 'owner' && <Console module={module} level="owner" onSwitch={roleParam ? null : reset} />}
     </Provider>
   )
 }
