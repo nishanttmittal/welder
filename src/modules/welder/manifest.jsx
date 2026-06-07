@@ -7,7 +7,6 @@ import { todayStr } from '../../core/utils/format'
 import { totalSent } from './logic/report'
 import { ADMIN_PASSWORD, MANAGER_PASSWORD, INCHARGE_LABEL } from './config'
 import Entry from './pages/Entry'
-import Dispatch from './pages/Dispatch'
 import PlatingOutbox from './pages/PlatingOutbox'
 import Dashboard from './pages/Dashboard'
 import History from './pages/History'
@@ -47,8 +46,7 @@ export const welderModule = {
   // roles: who sees the page in their console. Welder/staff use the floor entry.
   // Entry + History are open to User1 & Owner; Dashboard/Export/Admin owner-only.
   pages: [
-    { key: 'entry',     title: 'Material Sent',  desc: 'Record material sent for finishing',   icon: '➕', color: 'from-amber-600 to-amber-700', floor: true, floorTab: 'Add', roles: ['incharge', 'owner'], Component: Entry },
-    { key: 'dispatch',  title: 'Dispatch Gaadi', desc: 'Send a vehicle → plating challan',      icon: '🚚', color: 'from-orange-600 to-orange-700', floor: true, floorTab: 'Dispatch', roles: ['incharge', 'owner'], Component: Dispatch },
+    { key: 'entry',     title: 'Material Sent',  desc: 'Gaadi + add products → save',           icon: '➕', color: 'from-amber-600 to-amber-700', floor: true, roles: ['incharge', 'owner'], Component: Entry },
     { key: 'history',   title: 'Entries',        desc: 'View & edit entries (2-day window)',    icon: '🗂️', color: 'from-amber-500 to-amber-600', roles: ['incharge', 'owner'], Component: History },
     { key: 'outbox',    title: 'Plating Outbox', desc: 'Challans ready for the Plating app',    icon: '📤', color: 'from-blue-600 to-blue-700',   roles: ['owner'], Component: PlatingOutbox },
     { key: 'dashboard', title: 'Dashboard',      desc: 'Daily totals, by welder & party',      icon: '📊', color: 'from-blue-600 to-blue-700',   roles: ['owner'], Component: Dashboard },
