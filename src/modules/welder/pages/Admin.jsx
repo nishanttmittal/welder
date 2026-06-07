@@ -151,12 +151,65 @@ function ManageUsers() {
   )
 }
 
+/** Products — common to all welders, or exclusive to one (e.g. Jitender's
+ *  mechanism parts), plus a per-product "for plating" flag. */
+function ManageProducts() {
+  const { products, welders, log } = useWelder()
+  const { msg, show } = useToast()
+  const [name, setName] = useState('')
+  const [owner, setOwner] = useState('')      // '' = common to all welders
+  const [plating, setPlating] = useState(true)
+
+  const ownerOpts = [{ value: '', label: 'Common (all welders)' }, ...welders.list.map(w => ({ value: w.name, label: `${w.name} only` }))]
+
+  const add = () => {
+    const nm = name.trim()
+    if (!nm) return show('Enter a name', 2000)
+    if (products.list.some(x => x.name.toLowerCase() === nm.toLowerCase() && (x.welder || '') === owner)) return show('Already exists', 2000)
+    products.insert({ name: nm, welder: owner, noPlating: !plating, order: products.list.length })
+    log('ADD_PRODUCT', `${nm}${owner ? ` (${owner} only)` : ''}${plating ? '' : ' · no-plating'}`, 'owner')
+    show('Added ✓'); setName('')
+  }
+  const setOwnerFor = (p, w) => { products.update(p.id, { welder: w }); log('PRODUCT_OWNER', `${p.name} → ${w || 'Common'}`, 'owner') }
+  const togglePlating = (p) => { const np = !p.noPlating; products.update(p.id, { noPlating: np }); log('PRODUCT_PLATING', `${p.name} ${np ? 'no-plating' : 'for plating'}`, 'owner') }
+  const del = (p) => { if (confirm(`Delete "${p.name}"?`)) { products.remove(p.id); log('DEL_PRODUCT', p.name, 'owner') } }
+
+  const rows = [...products.list].sort((a, b) =>
+    (a.welder || '').localeCompare(b.welder || '') || (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name))
+
+  return (
+    <Card className="p-5 space-y-3">
+      <Toast msg={msg} />
+      <FieldLabel>Products ({products.list.length})</FieldLabel>
+      <p className="text-xs text-slate-400 -mt-1">Common products show for every welder. Tag a product to one welder (e.g. Jitender’s mechanism parts) so only they see it. “For plating” off = never sent to the plating app.</p>
+      <div className="space-y-2">
+        <TextInput placeholder="New product name" value={name} onChange={e => setName(e.target.value)} />
+        <div className="flex gap-2 items-center">
+          <Select value={owner} onChange={e => setOwner(e.target.value)} options={ownerOpts} />
+          <button onClick={() => setPlating(p => !p)} className={`text-xs font-bold px-3 py-2 rounded-xl whitespace-nowrap ${plating ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-500'}`}>{plating ? 'For plating' : 'No plating'}</button>
+          <Button variant="primary" onClick={add}>Add</Button>
+        </div>
+      </div>
+      <div className="space-y-1.5 max-h-80 overflow-auto">
+        {rows.map(p => (
+          <div key={p.id} className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2">
+            <span className="flex-1 text-sm font-semibold text-slate-700 truncate">{p.name}</span>
+            <Select className="!py-1.5 text-xs w-32" value={p.welder || ''} onChange={e => setOwnerFor(p, e.target.value)} options={ownerOpts} />
+            <button onClick={() => togglePlating(p)} title="For plating?" className={`text-xs font-bold px-2 py-1 rounded-lg ${p.noPlating ? 'bg-slate-200 text-slate-500' : 'bg-blue-100 text-blue-700'}`}>{p.noPlating ? 'No plating' : 'Plating'}</button>
+            <button onClick={() => del(p)} className="text-red-500 font-bold px-1">✕</button>
+          </div>
+        ))}
+      </div>
+    </Card>
+  )
+}
+
 export default function Admin() {
-  const { products, welders, parties, log } = useWelder()
+  const { welders, parties, log } = useWelder()
   return (
     <div className="max-w-lg mx-auto p-4 space-y-4">
       <ManageUsers />
-      <ManageList title="Products" repo={products} log={log} logKey="PRODUCT" hint="Each product is auto-available in all finishes (Chrome/Powder/Gold/Rose Gold)." />
+      <ManageProducts />
       <ManageList title="Welders" repo={welders} log={log} logKey="WELDER" />
       <ManageList title="Parties" repo={parties} log={log} logKey="PARTY" hint="Where material is sent: job-work persons / departments." />
       <DataTools />

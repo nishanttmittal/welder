@@ -31,7 +31,13 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
   const [fixQty, setFixQty] = useState('')
 
   const who = by || operator || (floor ? 'welder' : 'admin')
-  const productList = useMemo(() => [...products.list].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name)), [products.list])
+  // Per-welder product list: common products (welder='') + this welder's own
+  // products (e.g. Jitender's mechanism parts). Naveen never sees Jitender's.
+  const productList = useMemo(() =>
+    [...products.list]
+      .filter(p => !p.welder || p.welder === welder)
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name)),
+    [products.list, welder])
   const prodOpts = [{ value: '', label: '— product —' }, ...productList.map(p => ({ value: p.name, label: p.name }))]
   const partyOpts = [{ value: '', label: '— select —' }, ...parties.list.map(p => ({ value: p.name, label: p.name }))]
 
@@ -105,8 +111,11 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
       })
     })
     // Combined plating challan into the Outbox (same gaadi+party+date merges).
-    if (plating && gaadi.trim() && code) {
-      const its = filled.map(it => ({ product: `${code} ${it.product}`, quantity: Number(it.qty) }))
+    // Exclude products flagged "not for plating" (e.g. some mechanism parts).
+    const noPlatingSet = new Set(products.list.filter(p => p.noPlating).map(p => p.name))
+    const platingItems = filled.filter(it => !noPlatingSet.has(it.product))
+    if (plating && gaadi.trim() && code && platingItems.length) {
+      const its = platingItems.map(it => ({ product: `${code} ${it.product}`, quantity: Number(it.qty) }))
       const existing = platingOutbox.list.find(o => !o.pushed && o.gaadi === gaadi.trim() && o.party === party && o.date === date)
       if (existing) platingOutbox.update(existing.id, { items: [...(existing.items || []), ...its], welderChallans: [...(existing.welderChallans || []), code] })
       else platingOutbox.insert({ date, gaadi: gaadi.trim(), party, items: its, welderChallans: [code], pushed: false, platingChallanNo: '' })

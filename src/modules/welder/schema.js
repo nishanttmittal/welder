@@ -61,8 +61,19 @@ export const platingOutboxSchema = [
   field({ name: 'platingChallanNo', label: 'Plating Challan No', type: 'text', default: '' }),
 ]
 
+/**
+ * Base welded product. `welder` makes a product PER-WELDER:
+ *   ''            → common (every welder sees & can pick it)
+ *   '<name>'      → exclusive to that welder (e.g. Jitender's mechanism parts;
+ *                   Naveen never sees them).
+ * `noPlating` marks a product that is NOT sent for plating, so it is excluded
+ * from the plating outbox / future plating sync even on a plating finish.
+ * Both default to backward-compatible values (common, plating-eligible).
+ */
 export const productSchema = [
-  field({ name: 'name', label: 'Product', type: 'text', default: '', required: true }),
+  field({ name: 'name',      label: 'Product',         type: 'text',   default: '', required: true }),
+  field({ name: 'welder',    label: 'Belongs to',      type: 'text',   default: '' }),     // '' = common
+  field({ name: 'noPlating', label: 'Not for plating', type: 'toggle', default: false }),
 ]
 
 /**

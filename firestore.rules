@@ -1,19 +1,14 @@
 rules_version = '2';
 // ────────────────────────────────────────────────────────────────────────────
-// Firestore rules for the "unico-operations" project (hosts MULTIPLE apps).
+// Firestore rules for the "unico-operations" project (hosts ALL UNICO apps).
 // Paste in: Firebase Console → Firestore Database → Rules → Publish.
-// Keep ALL app blocks so publishing doesn't disable another app.
-//   • apps/platingjobwork/...  (Plating Job Work)  — unchanged
-//   • apps/fitting/...         (Fitting, LIVE)     — unchanged (do NOT touch)
-//   • apps/welder/...          (Welder Contractor) — ROLE-BASED (this app)
-//
-// WELDER ROLES (Google sign-in for Manager/Owner; welders are anonymous):
+// Keeps Plating / Fitting (LIVE) / Orders UNCHANGED (signed-in read+write).
+// WELDER is ROLE-BASED:
 //   • Anyone signed in (incl. anonymous welders) → operational data + reads.
 //   • Manager (users doc role 'manager', active) → can CREATE payments.
-//   • Owner (bootstrap email OR users doc role 'owner', active) → full control:
-//     set rates, edit/reverse payments, advances/adjustments, manage users.
-// ⚠️ PUBLISH ONLY AFTER confirming Google sign-in works in the app, so you are
-//    never locked out. Keep the bootstrap owner email in sync with config.js.
+//   • Owner (bootstrap email OR users doc role 'owner', active) → rates,
+//     edit/reverse payments, ledger, manage users.
+// Bootstrap owner can never be locked out. Keep it in sync with config.js.
 // ────────────────────────────────────────────────────────────────────────────
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -35,20 +30,16 @@ service cloud.firestore {
     }
 
     // ---- Plating Job Work (unchanged) ----------------------------------
-    match /apps/platingjobwork/{collection}/{docId} {
-      allow read, write: if request.auth != null;
-    }
-    match /apps/platingjobwork {
-      allow read, write: if request.auth != null;
-    }
+    match /apps/platingjobwork/{collection}/{docId} { allow read, write: if request.auth != null; }
+    match /apps/platingjobwork { allow read, write: if request.auth != null; }
 
     // ---- Fitting (LIVE — unchanged) ------------------------------------
-    match /apps/fitting/{collection}/{docId} {
-      allow read, write: if request.auth != null;
-    }
-    match /apps/fitting {
-      allow read, write: if request.auth != null;
-    }
+    match /apps/fitting/{collection}/{docId} { allow read, write: if request.auth != null; }
+    match /apps/fitting { allow read, write: if request.auth != null; }
+
+    // ---- Orders (unchanged) --------------------------------------------
+    match /apps/orders/{collection}/{docId} { allow read, write: if request.auth != null; }
+    match /apps/orders { allow read, write: if request.auth != null; }
 
     // ---- Welder Contractor (role-based) --------------------------------
     // Operational data: any signed-in user (welders are anonymous).
@@ -60,8 +51,7 @@ service cloud.firestore {
     match /apps/welder/logs/{id}            { allow read, write: if signedIn(); }
     match /apps/welder/meta/{id}            { allow read, write: if signedIn(); }
 
-    // Money: rates & ledger are OWNER-only to write; payments are
-    // Manager-create, Owner edit/reverse. Everyone signed-in may read.
+    // Money: owner-only writes; payments are Manager-create / Owner edit-reverse.
     match /apps/welder/rates/{id}    { allow read: if signedIn(); allow write: if isOwner(); }
     match /apps/welder/ledger/{id}   { allow read: if signedIn(); allow write: if isOwner(); }
     match /apps/welder/payments/{id} {
@@ -69,13 +59,9 @@ service cloud.firestore {
       allow create:         if isManager();
       allow update, delete: if isOwner();
     }
-
-    // Access control list: owner-managed.
     match /apps/welder/users/{id}    { allow read: if signedIn(); allow write: if isOwner(); }
 
     // Lock everything else.
-    match /{document=**} {
-      allow read, write: if false;
-    }
+    match /{document=**} { allow read, write: if false; }
   }
 }
