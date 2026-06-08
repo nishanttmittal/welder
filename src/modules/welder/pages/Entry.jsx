@@ -158,12 +158,12 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
               : <Select className="mt-1" value={welder} onChange={e => setWelder(e.target.value)} options={welders.list.map(w => ({ value: w.name, label: w.name }))} />}
           </div>
           <div>
-            <FieldLabel>Date</FieldLabel>
-            {floor
-              // Shop floor: locked to TODAY (no back-dating). Manager/Owner can change it.
-              ? <div className="mt-1 w-full border-2 border-slate-200 rounded-2xl px-4 py-2.5 text-base font-bold text-slate-700 bg-slate-50">{fmtDate(date)}</div>
-              : <input type="date" value={date} onChange={e => setDate(e.target.value)}
-                  className="mt-1 w-full border-2 border-slate-300 rounded-2xl px-3 py-2.5 text-base font-semibold focus:outline-none focus:ring-4 focus:ring-amber-200 focus:border-amber-500" />}
+            <FieldLabel>Date {floor && <span className="text-slate-400 font-normal normal-case">(today or last 2 days)</span>}</FieldLabel>
+            {/* Shop floor: only today + the last 2 days are selectable; older/future
+                dates are locked. Manager/Owner have no date limit. */}
+            <input type="date" value={date} onChange={e => setDate(e.target.value)}
+              min={floor ? daysAgoStr(2) : undefined} max={floor ? todayStr() : undefined}
+              className="mt-1 w-full border-2 border-slate-300 rounded-2xl px-3 py-2.5 text-base font-semibold focus:outline-none focus:ring-4 focus:ring-amber-200 focus:border-amber-500" />
           </div>
         </div>
       </Card>
