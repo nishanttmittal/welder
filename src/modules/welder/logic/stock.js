@@ -14,6 +14,13 @@ export const weightFromPieces = (avgWeight, pieces) => num(avgWeight) * num(piec
 
 export const recipeOf = (product) => (product && Array.isArray(product.recipe) ? product.recipe : [])
 
+/** Effective cost of ONE piece: weight materials use ₹/kg × avg weight (in kg);
+ *  number materials use ₹/piece. */
+export function effPieceCost(c) {
+  const avgKg = (c.weightUnit === 'gm' ? num(c.avgWeight) / 1000 : num(c.avgWeight))
+  return (c.measureBy === 'weight' && num(c.costPerKg)) ? avgKg * num(c.costPerKg) : num(c.unitCost)
+}
+
 /**
  * Stock map keyed by componentId.
  * @param components master list
@@ -27,7 +34,7 @@ export function computeStock(components, receipts, dispatches, products) {
     map[c.id] = {
       id: c.id, name: c.name, category: c.category || '',
       measureBy: c.measureBy || 'number', avgWeight: num(c.avgWeight), weightUnit: c.weightUnit || 'kg',
-      reorderLevel: num(c.reorderLevel), unitCost: num(c.unitCost), supplierName: c.supplierName || '',
+      reorderLevel: num(c.reorderLevel), unitCost: num(c.unitCost), costPerKg: num(c.costPerKg), supplierName: c.supplierName || '',
       received: 0, used: 0, stock: 0, weightEquiv: 0, value: 0, negative: false, reorder: false,
     }
   }
@@ -48,7 +55,7 @@ export function computeStock(components, receipts, dispatches, products) {
     const m = map[id]
     m.stock = m.received - m.used
     m.weightEquiv = m.stock * m.avgWeight
-    m.value = Math.max(0, m.stock) * m.unitCost
+    m.value = Math.max(0, m.stock) * effPieceCost(m)
     m.negative = m.stock < 0
     m.reorder = m.reorderLevel > 0 && m.stock <= m.reorderLevel
   }
@@ -62,8 +69,8 @@ export function reorderList(stockMap) {
     .sort((a, b) => (a.stock - a.reorderLevel) - (b.stock - b.reorderLevel))
 }
 
-/** Material cost to make one piece of a product (Σ recipe qty × unit cost). */
+/** Material cost to make one piece of a product (Σ recipe qty × per-piece cost). */
 export function materialCostOf(product, components) {
-  const cost = Object.fromEntries(components.map(c => [c.id, num(c.unitCost)]))
+  const cost = Object.fromEntries(components.map(c => [c.id, effPieceCost(c)]))
   return recipeOf(product).reduce((s, r) => s + num(r.qty) * (cost[r.componentId] || 0), 0)
 }

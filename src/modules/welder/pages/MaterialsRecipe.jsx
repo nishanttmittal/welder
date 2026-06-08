@@ -24,7 +24,7 @@ export default function MaterialsRecipe({ by = 'owner' }) {
 
 /* ── Raw materials master ────────────────────────────────────────────────── */
 function Materials({ components, log, show, by }) {
-  const blank = { name: '', category: '', measureBy: 'number', avgWeight: '', weightUnit: 'kg', reorderLevel: '', unitCost: '', supplierName: '' }
+  const blank = { name: '', category: '', measureBy: 'number', avgWeight: '', weightUnit: 'kg', reorderLevel: '', unitCost: '', costPerKg: '', supplierName: '' }
   const [f, setF] = useState(blank)
   const [editId, setEditId] = useState(null)
   const set = (k, v) => setF({ ...f, [k]: v })
@@ -36,13 +36,13 @@ function Materials({ components, log, show, by }) {
     const rec = {
       name, category: f.category.trim(), measureBy: f.measureBy,
       avgWeight: Number(f.avgWeight) || 0, weightUnit: f.weightUnit || 'kg',
-      reorderLevel: Number(f.reorderLevel) || 0, unitCost: Number(f.unitCost) || 0, supplierName: f.supplierName.trim(),
+      reorderLevel: Number(f.reorderLevel) || 0, unitCost: Number(f.unitCost) || 0, costPerKg: Number(f.costPerKg) || 0, supplierName: f.supplierName.trim(),
     }
     if (editId) { components.update(editId, rec); log('MATERIAL_EDIT', name, by) }
     else { components.insert(rec); log('MATERIAL_ADD', name, by) }
     show('Saved ✓'); setF(blank); setEditId(null)
   }
-  const edit = (c) => { setEditId(c.id); setF({ name: c.name, category: c.category || '', measureBy: c.measureBy || 'number', avgWeight: c.avgWeight || '', weightUnit: c.weightUnit || 'kg', reorderLevel: c.reorderLevel || '', unitCost: c.unitCost || '', supplierName: c.supplierName || '' }) }
+  const edit = (c) => { setEditId(c.id); setF({ name: c.name, category: c.category || '', measureBy: c.measureBy || 'number', avgWeight: c.avgWeight || '', weightUnit: c.weightUnit || 'kg', reorderLevel: c.reorderLevel || '', unitCost: c.unitCost || '', costPerKg: c.costPerKg || '', supplierName: c.supplierName || '' }) }
   const del = (c) => { if (confirm(`Delete material "${c.name}"?`)) { components.remove(c.id); log('MATERIAL_DEL', c.name, by) } }
 
   return (
@@ -62,7 +62,9 @@ function Materials({ components, log, show, by }) {
         )}
         <div className="grid grid-cols-3 gap-2">
           <div><FieldLabel>Reorder at</FieldLabel><NumberInput className="mt-1" value={f.reorderLevel} onChange={e => set('reorderLevel', e.target.value)} /></div>
-          <div><FieldLabel>₹/piece</FieldLabel><NumberInput className="mt-1" value={f.unitCost} onChange={e => set('unitCost', e.target.value)} /></div>
+          {f.measureBy === 'weight'
+            ? <div><FieldLabel>₹ / kg</FieldLabel><NumberInput className="mt-1" inputMode="decimal" step="0.01" value={f.costPerKg} onChange={e => set('costPerKg', e.target.value)} /></div>
+            : <div><FieldLabel>₹ / piece</FieldLabel><NumberInput className="mt-1" inputMode="decimal" step="0.01" value={f.unitCost} onChange={e => set('unitCost', e.target.value)} /></div>}
           <div><FieldLabel>Supplier</FieldLabel><TextInput className="mt-1" value={f.supplierName} onChange={e => set('supplierName', e.target.value)} /></div>
         </div>
         <div className="flex gap-2">

@@ -124,11 +124,32 @@ function DataTools() {
 }
 
 function Logs() {
-  const { logs } = useWelder()
+  const { logs, log } = useWelder()
+  const { msg, show } = useToast()
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
   const recent = [...logs.list].sort((a, b) => (b.ts || '').localeCompare(a.ts || '')).slice(0, 40)
+
+  const inRange = (l) => { const d = (l.ts || '').slice(0, 10); return (!from || d >= from) && (!to || d <= to) }
+  const matches = logs.list.filter(inRange)
+  const clearLogs = () => {
+    if (!matches.length) return show('No logs in that range', 2000)
+    if (!confirmDelete(`${matches.length} log entr${matches.length > 1 ? 'ies' : 'y'}`)) return
+    logs.removeWhere(inRange)
+    log('LOGS_CLEARED', `${matches.length} logs deleted (${from || 'start'} – ${to || 'now'})`, 'admin')
+    show(`Cleared ${matches.length} logs ✓`)
+  }
+  const sel = 'border-2 border-slate-200 rounded-xl px-2 py-2 text-sm bg-white'
+
   return (
     <Card className="p-5">
+      <Toast msg={msg} />
       <FieldLabel>Activity Log</FieldLabel>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <div><span className="text-xs text-slate-500">From</span><input type="date" value={from} onChange={e => setFrom(e.target.value)} className={`mt-1 w-full ${sel}`} /></div>
+        <div><span className="text-xs text-slate-500">To</span><input type="date" value={to} onChange={e => setTo(e.target.value)} className={`mt-1 w-full ${sel}`} /></div>
+      </div>
+      <button onClick={clearLogs} disabled={!matches.length} className={`mt-2 w-full rounded-xl py-2 text-sm font-bold ${matches.length ? 'bg-red-600 text-white' : 'bg-slate-200 text-slate-400'}`}>Clear {matches.length} log{matches.length === 1 ? '' : 's'} in range (type DELETE)</button>
       {recent.length === 0 ? <p className="text-sm text-slate-400 mt-3">No activity yet.</p> : (
         <div className="mt-3 space-y-1.5 max-h-80 overflow-auto">
           {recent.map((l, i) => (
@@ -264,12 +285,16 @@ function ManageProducts() {
                 <button onClick={() => setEditId(null)} className="text-xs font-bold text-slate-500 px-1">Cancel</button>
               </>
             ) : (
-              <>
-                <span className="flex-1 text-sm font-semibold text-slate-700 truncate">{p.name}</span>
-                <button onClick={() => startEdit(p)} className="text-blue-600 text-xs font-bold px-1">Edit name</button>
-                <Select className="!py-1.5 text-xs w-28" value={p.welder || ''} onChange={e => setOwnerFor(p, e.target.value)} options={ownerOpts} />
-                <button onClick={() => togglePlating(p)} title="For plating?" className={`text-xs font-bold px-2 py-1 rounded-lg ${p.noPlating ? 'bg-slate-200 text-slate-500' : 'bg-blue-100 text-blue-700'}`}>{p.noPlating ? 'No plating' : 'Plating'}</button>
-              </>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="flex-1 text-base font-semibold text-slate-800 truncate">{p.name}</span>
+                  <button onClick={() => startEdit(p)} className="text-blue-600 text-xs font-bold px-1 flex-shrink-0">Edit name</button>
+                </div>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <Select className="!py-1 !w-32 text-xs" value={p.welder || ''} onChange={e => setOwnerFor(p, e.target.value)} options={ownerOpts} />
+                  <button onClick={() => togglePlating(p)} title="For plating?" className={`text-[11px] font-bold px-2 py-1 rounded-lg flex-shrink-0 ${p.noPlating ? 'bg-slate-200 text-slate-500' : 'bg-blue-100 text-blue-700'}`}>{p.noPlating ? 'No plating' : 'For plating'}</button>
+                </div>
+              </div>
             )}
           </div>
         ))}

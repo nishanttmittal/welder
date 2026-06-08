@@ -91,7 +91,8 @@ export const componentSchema = [
   field({ name: 'avgWeight',    label: 'Avg weight per piece', type: 'number', default: 0 }),
   field({ name: 'weightUnit',   label: 'Weight unit',  type: 'text',   default: 'kg' }),
   field({ name: 'reorderLevel', label: 'Reorder level (pcs)', type: 'number', default: 0 }),
-  field({ name: 'unitCost',     label: 'Cost / piece (₹)', type: 'number', default: 0 }),
+  field({ name: 'unitCost',     label: 'Cost / piece (₹)', type: 'number', default: 0 }), // for 'number' materials
+  field({ name: 'costPerKg',    label: 'Cost / kg (₹)',    type: 'number', default: 0 }), // for 'weight' materials
   field({ name: 'supplierName', label: 'Supplier',     type: 'text',   default: '' }),
 ]
 
