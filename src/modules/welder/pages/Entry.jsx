@@ -158,11 +158,12 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
               : <Select className="mt-1" value={welder} onChange={e => setWelder(e.target.value)} options={welders.list.map(w => ({ value: w.name, label: w.name }))} />}
           </div>
           <div>
-            <FieldLabel>Date {floor && <span className="text-slate-400 font-normal normal-case">(today or last 2 days)</span>}</FieldLabel>
-            {/* Shop floor: only today + the last 2 days are selectable; older/future
-                dates are locked. Manager/Owner have no date limit. */}
+            <FieldLabel>Date {floor ? <span className="text-slate-400 font-normal normal-case">(today or last 2 days)</span> : (by !== 'Owner' && <span className="text-slate-400 font-normal normal-case">(last 7 days)</span>)}</FieldLabel>
+            {/* Date window by role: shop floor = today + last 2 days; Manager =
+                last 7 days; Owner = no limit. Older/future dates are locked. */}
             <input type="date" value={date} onChange={e => setDate(e.target.value)}
-              min={floor ? daysAgoStr(2) : undefined} max={floor ? todayStr() : undefined}
+              min={floor ? daysAgoStr(2) : (by === 'Owner' ? undefined : daysAgoStr(7))}
+              max={by === 'Owner' ? undefined : todayStr()}
               className="mt-1 w-full border-2 border-slate-300 rounded-2xl px-3 py-2.5 text-base font-semibold focus:outline-none focus:ring-4 focus:ring-amber-200 focus:border-amber-500" />
           </div>
         </div>
