@@ -6,7 +6,7 @@
 import { useRef, useState } from 'react'
 import { Button, Card, FieldLabel, TextInput, Select, useToast, Toast } from '../../../core/ui'
 import { useWelder } from '../WelderContext'
-import { OWNER_EMAILS } from '../config'
+import { OWNER_EMAILS, FINISHES, finishedName } from '../config'
 
 /** Reusable add/list/delete for a simple {name} collection. */
 function ManageList({ title, repo, hint, log, logKey }) {
@@ -154,7 +154,7 @@ function ManageUsers() {
 /** Products — common to all welders, or exclusive to one (e.g. Jitender's
  *  mechanism parts), plus a per-product "for plating" flag. */
 function ManageProducts() {
-  const { products, welders, log } = useWelder()
+  const { products, welders, dispatches, rates, log } = useWelder()
   const { msg, show } = useToast()
   const [name, setName] = useState('')
   const [owner, setOwner] = useState('')      // '' = common to all welders
@@ -173,6 +173,20 @@ function ManageProducts() {
   const setOwnerFor = (p, w) => { products.update(p.id, { welder: w }); log('PRODUCT_OWNER', `${p.name} → ${w || 'Common'}`, 'owner') }
   const togglePlating = (p) => { const np = !p.noPlating; products.update(p.id, { noPlating: np }); log('PRODUCT_PLATING', `${p.name} ${np ? 'no-plating' : 'for plating'}`, 'owner') }
   const del = (p) => { if (confirm(`Delete "${p.name}"?`)) { products.remove(p.id); log('DEL_PRODUCT', p.name, 'owner') } }
+  const rename = (p) => {
+    const nm = prompt(`Rename product "${p.name}" to:`, p.name)
+    if (nm === null) return
+    const newName = nm.trim()
+    if (!newName || newName === p.name) return
+    if (products.list.some(x => x.name.toLowerCase() === newName.toLowerCase() && x.id !== p.id)) return show('That name already exists', 2000)
+    products.update(p.id, { name: newName })
+    // cascade to existing entries + rates so balances/pay stay correct
+    let n = 0
+    dispatches.list.forEach(d => { if (d.productName === p.name) { dispatches.update(d.id, { productName: newName, finishedName: finishedName(newName, d.finish) }); n++ } })
+    rates.list.forEach(r => { if ((r.productName || r.product) === p.name) rates.update(r.id, { productName: newName }) })
+    log('PRODUCT_RENAME', `${p.name} → ${newName} (${n} entries)`, 'owner')
+    show(`Renamed in ${n} entries ✓`)
+  }
 
   const rows = [...products.list].sort((a, b) =>
     (a.welder || '').localeCompare(b.welder || '') || (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name))
@@ -194,12 +208,61 @@ function ManageProducts() {
         {rows.map(p => (
           <div key={p.id} className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2">
             <span className="flex-1 text-sm font-semibold text-slate-700 truncate">{p.name}</span>
-            <Select className="!py-1.5 text-xs w-32" value={p.welder || ''} onChange={e => setOwnerFor(p, e.target.value)} options={ownerOpts} />
+            <button onClick={() => rename(p)} className="text-blue-600 text-xs font-bold px-1">Rename</button>
+            <Select className="!py-1.5 text-xs w-28" value={p.welder || ''} onChange={e => setOwnerFor(p, e.target.value)} options={ownerOpts} />
             <button onClick={() => togglePlating(p)} title="For plating?" className={`text-xs font-bold px-2 py-1 rounded-lg ${p.noPlating ? 'bg-slate-200 text-slate-500' : 'bg-blue-100 text-blue-700'}`}>{p.noPlating ? 'No plating' : 'Plating'}</button>
             <button onClick={() => del(p)} className="text-red-500 font-bold px-1">✕</button>
           </div>
         ))}
       </div>
+    </Card>
+  )
+}
+
+/** Delete dispatch entries by date range + welder / product / finish / party. */
+function FilteredDelete() {
+  const { dispatches, welders, products, parties, log } = useWelder()
+  const { msg, show } = useToast()
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+  const [welderF, setWelderF] = useState('all')
+  const [productF, setProductF] = useState('all')
+  const [finishF, setFinishF] = useState('all')
+  const [partyF, setPartyF] = useState('all')
+
+  const match = (d) =>
+    (!from || (d.date || '') >= from) && (!to || (d.date || '') <= to)
+    && (welderF === 'all' || d.welder === welderF)
+    && (productF === 'all' || d.productName === productF)
+    && (finishF === 'all' || d.finish === finishF)
+    && (partyF === 'all' || d.party === partyF)
+  const matches = dispatches.list.filter(match)
+
+  const run = () => {
+    if (!matches.length) return show('No entries match these filters', 2200)
+    if (!confirm(`Delete ${matches.length} matching entr${matches.length > 1 ? 'ies' : 'y'}? This cannot be undone.`)) return
+    dispatches.removeWhere(match)
+    const f = [from && `from ${from}`, to && `to ${to}`, welderF !== 'all' && welderF, productF !== 'all' && productF, finishF !== 'all' && finishF, partyF !== 'all' && partyF].filter(Boolean).join(', ') || 'all'
+    log('DELETE_RANGE', `${matches.length} entries deleted (${f})`, 'owner')
+    show(`Deleted ${matches.length} entries ✓`)
+  }
+  const sel = 'border-2 border-slate-200 rounded-xl px-2 py-2 text-sm bg-white'
+  return (
+    <Card className="p-5 space-y-3 border-2 border-red-200">
+      <Toast msg={msg} />
+      <FieldLabel>Delete Entries (filtered)</FieldLabel>
+      <p className="text-xs text-slate-400 -mt-1">Pick a date range and any filters, then delete the matching entries.</p>
+      <div className="grid grid-cols-2 gap-2">
+        <div><span className="text-xs text-slate-500">From</span><input type="date" value={from} onChange={e => setFrom(e.target.value)} className={`mt-1 w-full ${sel}`} /></div>
+        <div><span className="text-xs text-slate-500">To</span><input type="date" value={to} onChange={e => setTo(e.target.value)} className={`mt-1 w-full ${sel}`} /></div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <Select value={welderF} onChange={e => setWelderF(e.target.value)} options={[{ value: 'all', label: 'All welders' }, ...welders.list.map(w => ({ value: w.name, label: w.name }))]} />
+        <Select value={productF} onChange={e => setProductF(e.target.value)} options={[{ value: 'all', label: 'All products' }, ...products.list.map(p => ({ value: p.name, label: p.name }))]} />
+        <Select value={finishF} onChange={e => setFinishF(e.target.value)} options={[{ value: 'all', label: 'All finishes' }, ...FINISHES.map(f => ({ value: f.key, label: f.label }))]} />
+        <Select value={partyF} onChange={e => setPartyF(e.target.value)} options={[{ value: 'all', label: 'All parties' }, ...parties.list.map(p => ({ value: p.name, label: p.name }))]} />
+      </div>
+      <button onClick={run} disabled={!matches.length} className={`w-full rounded-xl py-2.5 text-sm font-bold ${matches.length ? 'bg-red-600 text-white' : 'bg-slate-200 text-slate-400'}`}>Delete {matches.length} matching {matches.length === 1 ? 'entry' : 'entries'}</button>
     </Card>
   )
 }
@@ -212,6 +275,7 @@ export default function Admin() {
       <ManageProducts />
       <ManageList title="Welders" repo={welders} log={log} logKey="WELDER" />
       <ManageList title="Parties" repo={parties} log={log} logKey="PARTY" hint="Where material is sent: job-work persons / departments." />
+      <FilteredDelete />
       <DataTools />
       <Logs />
     </div>

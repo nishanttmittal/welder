@@ -56,7 +56,7 @@ export const welderModule = {
     { key: 'export',    title: 'Export / Share', desc: 'Daily PDF report for WhatsApp',         icon: '📄', color: 'from-violet-600 to-violet-700', roles: ['incharge', 'owner'], Component: Export },
     { key: 'stock',     title: 'Raw Material Stock', desc: 'Balance + add incoming stock',      icon: '📦', color: 'from-cyan-600 to-cyan-700',   roles: ['incharge', 'owner'], Component: RawMaterialStock },
     { key: 'materials', title: 'Materials & Recipe', desc: 'Raw materials + product recipes',   icon: '🧪', color: 'from-indigo-600 to-indigo-700', roles: ['owner'], Component: MaterialsRecipe },
-    { key: 'outbox',    title: 'Plating Outbox', desc: 'Challans ready for the Plating app',    icon: '📤', color: 'from-blue-600 to-blue-700',   roles: ['owner'], Component: PlatingOutbox },
+    { key: 'outbox',    title: 'Plating Outbox', desc: 'Challans ready for the Plating app',    icon: '📤', color: 'from-blue-600 to-blue-700',   roles: ['incharge', 'owner'], Component: PlatingOutbox },
     { key: 'admin',     title: 'Admin',          desc: 'Rates, users, products, backup',       icon: '⚙️', color: 'from-slate-600 to-slate-700', roles: ['owner'], Component: Admin },
   ],
 }

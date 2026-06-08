@@ -163,10 +163,11 @@ export default function ContractorPay({ owner = false, by = 'owner' }) {
         <Button size="sm" variant="neutral" className="w-full" onClick={exportExcel}>⬇ Export Excel (all contractors)</Button>
       </Card>
 
-      {/* Rates — owner edits (historical), In-Charge reads */}
+      {/* Rates + Rate History — OWNER ONLY (managers don't see rates or history). */}
+      {owner && <>
       <Card className="p-4">
         <button onClick={() => setShowRates(s => !s)} className="w-full flex items-center justify-between font-bold text-slate-700">
-          <span>💰 Piece Rates {owner ? '(time-based)' : '(view)'}</span><span className="text-slate-400">{showRates ? '▲' : '▼'}</span>
+          <span>💰 Piece Rates (time-based)</span><span className="text-slate-400">{showRates ? '▲' : '▼'}</span>
         </button>
         {showRates && (
           <div className="mt-3 space-y-3">
@@ -241,6 +242,7 @@ export default function ContractorPay({ owner = false, by = 'owner' }) {
           </div>
         )}
       </Card>
+      </>}
 
       {/* Per-contractor statements */}
       {statements.map(st => {

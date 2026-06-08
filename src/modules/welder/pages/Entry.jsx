@@ -26,6 +26,7 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
   const [gaadi, setGaadi] = useState('')
   const [items, setItems] = useState([{ product: '', qty: '' }, { product: '', qty: '' }, { product: '', qty: '' }])
   const [confirming, setConfirming] = useState(false)
+  const [dupWarn, setDupWarn] = useState('') // products already entered today for this gaadi
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false) // hard guard against a fast double-tap on Save
   const [fixing, setFixing] = useState(null)
@@ -78,6 +79,10 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
     if (!party) return show('Pick where it is sent', 2000)
     if (plating && !gaadi.trim()) return show('Enter the gaadi (vehicle) number', 2500)
     if (filled.length === 0) return show('Add at least one product + quantity', 2500)
+    // Duplicate alarm: same product + same gaadi already entered today.
+    const g = gaadi.trim()
+    const dups = g ? filled.filter(it => dispatches.list.some(d => d.date === date && (d.gaadi || '') === g && d.productName === it.product && Number(d.qty) > 0)).map(it => it.product) : []
+    setDupWarn(dups.join(', '))
     savingRef.current = false; setSaving(false) // fresh attempt
     setConfirming(true)
   }
@@ -177,7 +182,7 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
         </div>
         <div>
           <FieldLabel>Gaadi No {plating ? <span className="text-red-400 font-normal normal-case">(required for plating)</span> : <span className="text-slate-400 font-normal normal-case">(optional)</span>}</FieldLabel>
-          <TextInput className="mt-1.5" placeholder="e.g. HR55 1234" value={gaadi} onChange={e => setGaadi(e.target.value)} />
+          <TextInput className="mt-1.5" inputMode="numeric" placeholder="4 digits e.g. 1234" value={gaadi} onChange={e => setGaadi(e.target.value.replace(/\D/g, '').slice(0, 4))} />
         </div>
       </Card>
 
@@ -213,7 +218,9 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
                   </div>
                   <span className={`font-mono font-bold ${d.qty === 0 ? 'text-slate-400' : 'text-amber-700'}`}>{d.qty === 0 ? 'cancelled' : `× ${fmtNum(d.qty)}`}</span>
                 </div>
-                {canEditDay && d.qty > 0 && (
+                {/* Welder entries are LOCKED for the welder — only Manager (≤2 days)
+                    and Admin (anytime) correct them in Entries/History. */}
+                {!floor && canEditDay && d.qty > 0 && (
                   <div className="flex gap-2 mt-2">
                     <button onClick={() => openFix(d)} className="flex-1 text-xs font-bold text-blue-600 bg-blue-50 rounded-lg py-1.5">✎ Fix qty</button>
                     <button onClick={() => cancelEntry(d)} className="flex-1 text-xs font-bold text-red-600 bg-red-50 rounded-lg py-1.5">✕ Cancel</button>
@@ -242,6 +249,11 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-5" onClick={() => setConfirming(false)}>
           <Card className="p-6 w-full max-w-sm space-y-3" onClick={e => e.stopPropagation()}>
             <div className="font-bold text-slate-800">Save this challan?</div>
+            {dupWarn && (
+              <div className="bg-red-50 border-2 border-red-300 rounded-xl p-3 text-sm text-red-700 font-semibold">
+                ⚠ Already entered today for gaadi {gaadi.trim()}: <b>{dupWarn}</b>. This may be a double entry — save again only if it's really a new load.
+              </div>
+            )}
             <div className="text-sm text-slate-500">
               {welder} → <b>{party}</b> ({FINISHES.find(f => f.key === finish)?.suffix}){gaadi.trim() ? ` · gaadi …${last4(gaadi)}` : ''}
             </div>
