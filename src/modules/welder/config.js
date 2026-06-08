@@ -45,6 +45,13 @@ export const QUICK_QTYS = [5, 10, 25, 50, 100, 200]
 /** Payment modes for contractor payments. */
 export const PAYMENT_MODES = ['Cash', 'UPI', 'Cheque', 'Bank Transfer']
 
+/** Incoming raw material: flag the lot if its avg weight/piece deviates from the
+ *  material's standard avg by more than this %. (Entry is still accepted.) */
+export const AVG_WEIGHT_TOLERANCE_PCT = 1
+
+/** Manager can view Contractor Pay & Ledger only this many months back. */
+export const MANAGER_HISTORY_MONTHS = 2
+
 /**
  * Finishes a welded product can be sent for. The finish is appended AFTER the
  * product name (e.g. "Spider Chrome"). Default party is a hint for the entry
@@ -123,4 +130,5 @@ export const KEYS = {
   users:        'users',
   components:   'components',
   receipts:     'receipts',
+  adjustments:  'adjustments',
 }

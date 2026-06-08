@@ -12,6 +12,13 @@ export const piecesFromWeight = (avgWeight, weight) => num(avgWeight) > 0 ? Math
 /** Expected weight for a piece count (recheck helper). */
 export const weightFromPieces = (avgWeight, pieces) => num(avgWeight) * num(pieces)
 
+/** % the lot avg weight deviates from the standard (0 if either is 0). */
+export function avgDeviationPct(standardAvg, lotAvg) {
+  const s = num(standardAvg), l = num(lotAvg)
+  if (s <= 0 || l <= 0) return 0
+  return Math.abs(l - s) / s * 100
+}
+
 export const recipeOf = (product) => (product && Array.isArray(product.recipe) ? product.recipe : [])
 
 /** Effective cost of ONE piece: weight materials use ₹/kg × avg weight (in kg);
@@ -28,18 +35,21 @@ export function effPieceCost(c) {
  * @param dispatches welder dispatches (consumption source; qty>0 only)
  * @param products   product master (for recipes; matched to dispatch by name)
  */
-export function computeStock(components, receipts, dispatches, products) {
+export function computeStock(components, receipts, dispatches, products, adjustments = []) {
   const map = {}
   for (const c of components) {
     map[c.id] = {
       id: c.id, name: c.name, category: c.category || '',
       measureBy: c.measureBy || 'number', avgWeight: num(c.avgWeight), weightUnit: c.weightUnit || 'kg',
       reorderLevel: num(c.reorderLevel), unitCost: num(c.unitCost), costPerKg: num(c.costPerKg), supplierName: c.supplierName || '',
-      received: 0, used: 0, stock: 0, weightEquiv: 0, value: 0, negative: false, reorder: false,
+      received: 0, used: 0, adjusted: 0, stock: 0, weightEquiv: 0, value: 0, negative: false, reorder: false,
     }
   }
   for (const r of receipts) {
     if (map[r.componentId]) map[r.componentId].received += num(r.qty)
+  }
+  for (const a of (adjustments || [])) {
+    if (map[a.componentId]) map[a.componentId].adjusted += num(a.delta)
   }
   const prodByName = {}
   for (const p of products) prodByName[p.name] = p
@@ -53,7 +63,7 @@ export function computeStock(components, receipts, dispatches, products) {
   }
   for (const id in map) {
     const m = map[id]
-    m.stock = m.received - m.used
+    m.stock = m.received - m.used + m.adjusted
     m.weightEquiv = m.stock * m.avgWeight
     m.value = Math.max(0, m.stock) * effPieceCost(m)
     m.negative = m.stock < 0

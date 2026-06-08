@@ -104,9 +104,22 @@ export const receiptSchema = [
   field({ name: 'qty',           label: 'Pieces',    type: 'number', default: 0 }),
   field({ name: 'weight',        label: 'Weight',    type: 'number', default: 0 }),
   field({ name: 'avgWeightUsed', label: 'Lot avg wt', type: 'number', default: 0 }),
+  field({ name: 'flagged',       label: 'Avg-wt flagged', type: 'toggle', default: false }),
   field({ name: 'enteredAs',     label: 'Entered as', type: 'text',   default: 'number' }), // number | weight
   field({ name: 'by',            label: 'By',        type: 'text',   default: '' }),
   field({ name: 'note',          label: 'Note',      type: 'text',   default: '' }),
+]
+
+/** Stock set-off / adjustment (owner): physical count vs system, stored as a delta. */
+export const adjustmentSchema = [
+  field({ name: 'date',          label: 'Date',       type: 'date',   default: todayStr }),
+  field({ name: 'componentId',   label: 'Material',   type: 'text',   default: '' }),
+  field({ name: 'componentName', label: 'Material',   type: 'text',   default: '' }),
+  field({ name: 'counted',       label: 'Counted',    type: 'number', default: 0 }),
+  field({ name: 'systemBefore',  label: 'System was', type: 'number', default: 0 }),
+  field({ name: 'delta',         label: 'Adjustment', type: 'number', default: 0 }),
+  field({ name: 'reason',        label: 'Reason',     type: 'text',   default: '' }),
+  field({ name: 'by',            label: 'By',         type: 'text',   default: '' }),
 ]
 
 /**

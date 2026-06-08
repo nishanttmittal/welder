@@ -5,7 +5,7 @@
  */
 import { createContext, useContext, useCallback } from 'react'
 import { useCollection } from '../../core/hooks/useCollection'
-import { dispatchesRepo, productsRepo, weldersRepo, partiesRepo, logsRepo, lastUsedStore, platingOutboxRepo, countersStore, ratesRepo, paymentsRepo, ledgerRepo, usersRepo, componentsRepo, receiptsRepo } from './data'
+import { dispatchesRepo, productsRepo, weldersRepo, partiesRepo, logsRepo, lastUsedStore, platingOutboxRepo, countersStore, ratesRepo, paymentsRepo, ledgerRepo, usersRepo, componentsRepo, receiptsRepo, adjustmentsRepo } from './data'
 import { isFirebaseConfigured } from '../../core/db/firebaseConfig'
 import { FirestoreProvider } from './FirestoreProvider'
 
@@ -30,6 +30,7 @@ export function LocalWelderProvider({ children }) {
   const users      = useCollection(usersRepo)
   const components = useCollection(componentsRepo)
   const receipts   = useCollection(receiptsRepo)
+  const adjustments = useCollection(adjustmentsRepo)
   const logs       = useCollection(logsRepo)
 
   const log = useCallback((action, detail, by = 'user', ref = '') => {
@@ -37,7 +38,7 @@ export function LocalWelderProvider({ children }) {
   }, [logs])
 
   const value = {
-    dispatches, products, welders, parties, platingOutbox, rates, payments, ledger, users, components, receipts, logs,
+    dispatches, products, welders, parties, platingOutbox, rates, payments, ledger, users, components, receipts, adjustments, logs,
     lastUsed: lastUsedStore, counters: countersStore, log,
     cloud: { connected: false, error: '' },
   }

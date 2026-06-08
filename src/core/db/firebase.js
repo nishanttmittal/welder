@@ -66,6 +66,8 @@ export const paths = {
   component: (id) => cdoc('components', id),
   receipts: () => coll('receipts'),
   receipt: (id) => cdoc('receipts', id),
+  adjustments: () => coll('adjustments'),
+  adjustment: (id) => cdoc('adjustments', id),
 }
 
 /**

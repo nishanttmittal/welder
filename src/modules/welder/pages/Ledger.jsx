@@ -14,7 +14,13 @@ import { Button, Card, FieldLabel, NumberInput, Select, TextInput, DateInput, us
 import { todayStr, fmtNum, fmtDate } from '../../../core/utils/format'
 import { useWelder } from '../WelderContext'
 import { buildLedger, nextPaymentSlip, newPayment, paidByLabel } from '../logic/pay'
-import { PAYMENT_MODES } from '../config'
+import { PAYMENT_MODES, MANAGER_HISTORY_MONTHS } from '../config'
+
+/** First selectable date for a Manager (owner unlimited). */
+function managerFloorDate() {
+  const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - MANAGER_HISTORY_MONTHS)
+  return d.toISOString().slice(0, 10)
+}
 
 const money = (n) => '₹' + fmtNum(Math.round(Number(n) || 0))
 const signed = (n) => (n < 0 ? '-' : '') + money(Math.abs(n))
@@ -38,6 +44,8 @@ export default function Ledger({ owner = false, by = 'owner' }) {
   const [month, setMonth] = useState(todayStr().slice(0, 7))
   const [from, setFrom] = useState(todayStr().slice(0, 8) + '01')
   const [to, setTo] = useState(todayStr())
+  const mgrMinDate = owner ? undefined : managerFloorDate()
+  const mgrMinMonth = owner ? undefined : managerFloorDate().slice(0, 7)
   const [form, setForm] = useState(null)                    // { type, dir } when adding
   const [editPay, setEditPay] = useState(null)              // payment record being edited
 
@@ -139,11 +147,12 @@ export default function Ledger({ owner = false, by = 'owner' }) {
           ))}
         </div>
         {mode === 'month'
-          ? <input type="month" value={month} onChange={e => setMonth(e.target.value)} className="w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold" />
+          ? <input type="month" value={month} min={mgrMinMonth} onChange={e => setMonth(e.target.value)} className="w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold" />
           : <div className="grid grid-cols-2 gap-2">
-              <div><FieldLabel>From</FieldLabel><DateInput className="mt-1" value={from} onChange={e => setFrom(e.target.value)} /></div>
-              <div><FieldLabel>To</FieldLabel><DateInput className="mt-1" value={to} onChange={e => setTo(e.target.value)} /></div>
+              <div><FieldLabel>From</FieldLabel><DateInput className="mt-1" value={from} min={mgrMinDate} onChange={e => setFrom(e.target.value)} /></div>
+              <div><FieldLabel>To</FieldLabel><DateInput className="mt-1" value={to} min={mgrMinDate} onChange={e => setTo(e.target.value)} /></div>
             </div>}
+        {!owner && <p className="text-[10px] text-slate-400">Manager view: last {MANAGER_HISTORY_MONTHS} months</p>}
         <div className="grid grid-cols-2 gap-2">
           <Button size="sm" variant="neutral" onClick={exportLedgerPDF}>📄 Ledger PDF</Button>
           <Button size="sm" variant="neutral" onClick={exportSettlementPDF}>🧾 Settlement PDF</Button>

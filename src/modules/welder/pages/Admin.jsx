@@ -77,17 +77,17 @@ function confirmDelete(what) {
 }
 
 function DataTools() {
-  const { dispatches, products, welders, parties, platingOutbox, rates, payments, ledger, users, components, receipts, logs, log } = useWelder()
+  const { dispatches, products, welders, parties, platingOutbox, rates, payments, ledger, users, components, receipts, adjustments, logs, log } = useWelder()
   const { msg, show } = useToast()
   const fileRef = useRef(null)
 
   // Back up EVERYTHING (every collection in the app).
   const backup = () => {
     const data = {
-      app: 'welder', version: 3, exportedAt: new Date().toISOString(),
+      app: 'welder', version: 4, exportedAt: new Date().toISOString(),
       dispatches: dispatches.list, products: products.list, welders: welders.list, parties: parties.list,
       rates: rates.list, payments: payments.list, ledger: ledger.list, users: users.list,
-      components: components.list, receipts: receipts.list, platingOutbox: platingOutbox.list, logs: logs.list,
+      components: components.list, receipts: receipts.list, adjustments: adjustments.list, platingOutbox: platingOutbox.list, logs: logs.list,
     }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `welder-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click()
@@ -98,7 +98,7 @@ function DataTools() {
     try {
       const data = JSON.parse(await f.text())
       if (!confirm('Restore will REPLACE all current data with the backup. Continue?')) return
-      const map = { dispatches, products, welders, parties, rates, payments, ledger, users, components, receipts, platingOutbox }
+      const map = { dispatches, products, welders, parties, rates, payments, ledger, users, components, receipts, adjustments, platingOutbox }
       for (const [k, repo] of Object.entries(map)) { if (Array.isArray(data[k])) await repo.replaceAll(data[k]) }
       log('RESTORE', f.name, 'admin'); show('Restored ✓')
     } catch { show('Invalid backup file', 3000) } finally { if (fileRef.current) fileRef.current.value = '' }
