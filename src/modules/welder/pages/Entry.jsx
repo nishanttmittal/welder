@@ -15,7 +15,7 @@ import { makeId } from '../../../core/db/repository'
 import { pushPlatingIncoming } from '../../../core/db/firebase'
 
 export default function Entry({ floor = false, operator = '', by = '' }) {
-  const { dispatches, products, welders, parties, platingOutbox, counters, log, lastUsed } = useWelder()
+  const { dispatches, products, welders, parties, counters, log, lastUsed } = useWelder()
   const { msg, show } = useToast()
   const remembered = lastUsed.get()
 
@@ -116,16 +116,11 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
         createdByRole, updatedAt: stamp, factoryId: DEFAULT_FACTORY_ID,
       })
     })
-    // Combined plating challan into the Outbox (same gaadi+party+date merges).
-    // Exclude products flagged "not for plating" (e.g. some mechanism parts).
+    // Plating-eligible items (exclude "not for plating" products). The old
+    // Plating Outbox preview is removed — material flows to the Plating app via
+    // the Incoming queue below.
     const noPlatingSet = new Set(products.list.filter(p => p.noPlating).map(p => p.name))
     const platingItems = filled.filter(it => !noPlatingSet.has(it.product))
-    if (plating && gaadi.trim() && code && platingItems.length) {
-      const its = platingItems.map(it => ({ product: `${code} ${it.product}`, quantity: Number(it.qty) }))
-      const existing = platingOutbox.list.find(o => !o.pushed && o.gaadi === gaadi.trim() && o.party === party && o.date === date)
-      if (existing) platingOutbox.update(existing.id, { items: [...(existing.items || []), ...its], welderChallans: [...(existing.welderChallans || []), code] })
-      else platingOutbox.insert({ date, gaadi: gaadi.trim(), party, items: its, welderChallans: [code], pushed: false, platingChallanNo: '' })
-    }
     // REAL plating integration: queue an "Incoming From Welder" item in the
     // Plating app (no challan yet — they Accept it there). Plating finishes only,
     // dated on/after the cutoff. Idempotent by id (one per welder challan).
