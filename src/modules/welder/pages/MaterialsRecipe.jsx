@@ -56,8 +56,8 @@ function Materials({ components, log, show, by }) {
         </div>
         {f.measureBy === 'weight' && (
           <div className="grid grid-cols-2 gap-2">
-            <div><FieldLabel>Avg weight / piece</FieldLabel><NumberInput className="mt-1" value={f.avgWeight} onChange={e => set('avgWeight', e.target.value)} /></div>
-            <div><FieldLabel>Weight unit</FieldLabel><TextInput className="mt-1" value={f.weightUnit} onChange={e => set('weightUnit', e.target.value)} /></div>
+            <div><FieldLabel>Avg weight / piece</FieldLabel><NumberInput className="mt-1" inputMode="decimal" step="0.001" placeholder="e.g. 0.037" value={f.avgWeight} onChange={e => set('avgWeight', e.target.value)} /></div>
+            <div><FieldLabel>Unit</FieldLabel><Select className="mt-1" value={f.weightUnit} onChange={e => set('weightUnit', e.target.value)} options={[{ value: 'kg', label: 'kg' }, { value: 'gm', label: 'gm' }]} /></div>
           </div>
         )}
         <div className="grid grid-cols-3 gap-2">

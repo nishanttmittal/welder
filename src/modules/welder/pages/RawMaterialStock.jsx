@@ -34,7 +34,7 @@ export default function RawMaterialStock({ by = 'user' }) {
               <div key={m.id} className={`flex items-center gap-2 rounded-xl px-3 py-2 ${m.negative ? 'bg-red-50' : m.reorder ? 'bg-amber-50' : 'bg-slate-50'}`}>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold text-slate-700 truncate">{m.name}{(m.reorder || m.negative) && <span className="ml-1 text-[10px] font-bold text-amber-600">● low</span>}</div>
-                  <div className="text-[11px] text-slate-400">in {fmtNum(m.received)} · used {fmtNum(m.used)}{m.measureBy === 'weight' && m.avgWeight ? ` · ≈ ${fmtNum(Math.round(m.weightEquiv))}${m.weightUnit}` : ''}</div>
+                  <div className="text-[11px] text-slate-400">in {fmtNum(m.received)} · used {fmtNum(m.used)}{m.measureBy === 'weight' && m.avgWeight ? ` · ≈ ${Number(m.weightEquiv.toFixed(3))} ${m.weightUnit}` : ''}</div>
                 </div>
                 <div className={`text-right font-mono font-bold ${m.negative ? 'text-red-600' : m.reorder ? 'text-amber-700' : 'text-slate-700'}`}>
                   {fmtNum(m.stock)} <span className="text-[11px] font-normal text-slate-400">pcs</span>
@@ -89,8 +89,8 @@ function IncomingForm({ components, onDone, receipts, log, show, by }) {
         <div><FieldLabel>Pieces received</FieldLabel><NumberInput className="mt-1" value={pieces} onChange={e => setPieces(e.target.value)} /></div>
       ) : (
         <div className="grid grid-cols-2 gap-2">
-          <div><FieldLabel>Weight received</FieldLabel><NumberInput className="mt-1" value={weight} onChange={e => setWeight(e.target.value)} /></div>
-          <div><FieldLabel>Avg wt / piece</FieldLabel><NumberInput className="mt-1" value={avg} onChange={e => setAvg(e.target.value)} /></div>
+          <div><FieldLabel>Weight received ({comp?.weightUnit || 'kg'})</FieldLabel><NumberInput className="mt-1" inputMode="decimal" step="0.001" placeholder="0.000" value={weight} onChange={e => setWeight(e.target.value)} /></div>
+          <div><FieldLabel>Avg / piece ({comp?.weightUnit || 'kg'})</FieldLabel><NumberInput className="mt-1" inputMode="decimal" step="0.001" value={avg} onChange={e => setAvg(e.target.value)} /></div>
           <div className="col-span-2 text-xs text-slate-500">= <b>{fmtNum(derivedPieces)}</b> pieces {Number(avg) > 0 ? '' : '(set avg weight)'}</div>
         </div>
       )}
