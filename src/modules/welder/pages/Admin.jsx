@@ -41,7 +41,7 @@ function ManageList({ title, repo, hint, log, logKey }) {
 }
 
 function DataTools() {
-  const { dispatches, products, welders, parties, logs, log } = useWelder()
+  const { dispatches, products, welders, parties, platingOutbox, logs, log } = useWelder()
   const { msg, show } = useToast()
   const fileRef = useRef(null)
 
@@ -68,6 +68,10 @@ function DataTools() {
     if (!confirm('Delete ALL dispatch entries? Master lists stay. Cannot be undone.')) return
     await dispatches.reset(); log('RESET', 'Cleared dispatches', 'admin'); show('Cleared ✓')
   }
+  const clearOutbox = async () => {
+    if (!confirm('Clear the Plating Outbox list? This only clears the preview list — it does NOT touch your entries or the Plating app.')) return
+    await platingOutbox.reset(); log('RESET', 'Cleared plating outbox', 'admin'); show('Outbox cleared ✓')
+  }
   return (
     <Card className="p-5 space-y-3">
       <Toast msg={msg} />
@@ -78,6 +82,8 @@ function DataTools() {
       </div>
       <input ref={fileRef} type="file" accept="application/json" className="hidden" onChange={restore} />
       <Button variant="danger" className="w-full" onClick={resetDispatches}>Clear all dispatches</Button>
+      <Button variant="neutral" className="w-full" onClick={clearOutbox}>🧹 Clear Plating Outbox list</Button>
+      <p className="text-[11px] text-slate-400">The Plating Outbox is a separate list — deleting entries doesn’t clear it.</p>
     </Card>
   )
 }
