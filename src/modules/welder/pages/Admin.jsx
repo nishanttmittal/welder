@@ -40,50 +40,60 @@ function ManageList({ title, repo, hint, log, logKey }) {
   )
 }
 
+/** Type-to-confirm so a stray tap can never delete data. */
+function confirmDelete(what) {
+  const t = window.prompt(`To delete ${what}, type DELETE below and press OK:`)
+  return t !== null && t.trim().toUpperCase() === 'DELETE'
+}
+
 function DataTools() {
-  const { dispatches, products, welders, parties, platingOutbox, logs, log } = useWelder()
+  const { dispatches, products, welders, parties, platingOutbox, rates, payments, ledger, users, components, receipts, logs, log } = useWelder()
   const { msg, show } = useToast()
   const fileRef = useRef(null)
 
+  // Back up EVERYTHING (every collection in the app).
   const backup = () => {
-    const data = { app: 'welder', exportedAt: new Date().toISOString(),
-      dispatches: dispatches.list, products: products.list, welders: welders.list, parties: parties.list, logs: logs.list }
+    const data = {
+      app: 'welder', version: 3, exportedAt: new Date().toISOString(),
+      dispatches: dispatches.list, products: products.list, welders: welders.list, parties: parties.list,
+      rates: rates.list, payments: payments.list, ledger: ledger.list, users: users.list,
+      components: components.list, receipts: receipts.list, platingOutbox: platingOutbox.list, logs: logs.list,
+    }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `welder-backup-${new Date().toISOString().slice(0,10)}.json`; a.click()
-    show('Backup downloaded ✓')
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `welder-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click()
+    show('Full backup downloaded ✓')
   }
   const restore = async (e) => {
     const f = e.target.files?.[0]; if (!f) return
     try {
       const data = JSON.parse(await f.text())
-      if (!confirm('Restore will REPLACE all current data. Continue?')) return
-      await dispatches.replaceAll(data.dispatches || [])
-      await products.replaceAll(data.products || [])
-      await welders.replaceAll(data.welders || [])
-      await parties.replaceAll(data.parties || [])
+      if (!confirm('Restore will REPLACE all current data with the backup. Continue?')) return
+      const map = { dispatches, products, welders, parties, rates, payments, ledger, users, components, receipts, platingOutbox }
+      for (const [k, repo] of Object.entries(map)) { if (Array.isArray(data[k])) await repo.replaceAll(data[k]) }
       log('RESTORE', f.name, 'admin'); show('Restored ✓')
     } catch { show('Invalid backup file', 3000) } finally { if (fileRef.current) fileRef.current.value = '' }
   }
   const resetDispatches = async () => {
-    if (!confirm('Delete ALL dispatch entries? Master lists stay. Cannot be undone.')) return
+    if (!confirmDelete('ALL dispatch entries')) return
     await dispatches.reset(); log('RESET', 'Cleared dispatches', 'admin'); show('Cleared ✓')
   }
   const clearOutbox = async () => {
-    if (!confirm('Clear the Plating Outbox list? This only clears the preview list — it does NOT touch your entries or the Plating app.')) return
+    if (!confirmDelete('the Plating Outbox list')) return
     await platingOutbox.reset(); log('RESET', 'Cleared plating outbox', 'admin'); show('Outbox cleared ✓')
   }
   return (
     <Card className="p-5 space-y-3">
       <Toast msg={msg} />
       <FieldLabel>Backup &amp; Reset</FieldLabel>
+      <p className="text-[11px] text-slate-400 -mt-1">Backup includes EVERYTHING — entries, rates, payments, ledger, materials, stock, users, etc.</p>
       <div className="grid grid-cols-2 gap-2">
-        <Button variant="primary" onClick={backup}>⬇ Backup</Button>
+        <Button variant="primary" onClick={backup}>⬇ Backup all data</Button>
         <Button variant="neutral" onClick={() => fileRef.current?.click()}>⬆ Restore</Button>
       </div>
       <input ref={fileRef} type="file" accept="application/json" className="hidden" onChange={restore} />
-      <Button variant="danger" className="w-full" onClick={resetDispatches}>Clear all dispatches</Button>
       <Button variant="neutral" className="w-full" onClick={clearOutbox}>🧹 Clear Plating Outbox list</Button>
-      <p className="text-[11px] text-slate-400">The Plating Outbox is a separate list — deleting entries doesn’t clear it.</p>
+      <Button variant="danger" className="w-full" onClick={resetDispatches}>Clear ALL dispatches (type DELETE)</Button>
+      <p className="text-[11px] text-slate-400">Deletes ask you to type DELETE first, so a stray tap can’t wipe data. For precise removal use “Delete Entries (filtered)” above.</p>
     </Card>
   )
 }
@@ -165,6 +175,8 @@ function ManageProducts() {
   const [name, setName] = useState('')
   const [owner, setOwner] = useState('')      // '' = common to all welders
   const [plating, setPlating] = useState(true)
+  const [editId, setEditId] = useState(null)
+  const [editName, setEditName] = useState('')
 
   const ownerOpts = [{ value: '', label: 'Common (all welders)' }, ...welders.list.map(w => ({ value: w.name, label: `${w.name} only` }))]
 
@@ -178,21 +190,24 @@ function ManageProducts() {
   }
   const setOwnerFor = (p, w) => { products.update(p.id, { welder: w }); log('PRODUCT_OWNER', `${p.name} → ${w || 'Common'}`, 'owner') }
   const togglePlating = (p) => { const np = !p.noPlating; products.update(p.id, { noPlating: np }); log('PRODUCT_PLATING', `${p.name} ${np ? 'no-plating' : 'for plating'}`, 'owner') }
-  const del = (p) => { if (confirm(`Delete "${p.name}"?`)) { products.remove(p.id); log('DEL_PRODUCT', p.name, 'owner') } }
-  const rename = (p) => {
-    const nm = prompt(`Rename product "${p.name}" to:`, p.name)
-    if (nm === null) return
-    const newName = nm.trim()
-    if (!newName || newName === p.name) return
-    if (products.list.some(x => x.name.toLowerCase() === newName.toLowerCase() && x.id !== p.id)) return show('That name already exists', 2000)
-    products.update(p.id, { name: newName })
-    // cascade to existing entries + rates so balances/pay stay correct
-    let n = 0
-    dispatches.list.forEach(d => { if (d.productName === p.name) { dispatches.update(d.id, { productName: newName, finishedName: finishedName(newName, d.finish) }); n++ } })
-    rates.list.forEach(r => { if ((r.productName || r.product) === p.name) rates.update(r.id, { productName: newName }) })
-    log('PRODUCT_RENAME', `${p.name} → ${newName} (${n} entries)`, 'owner')
-    show(`Renamed in ${n} entries ✓`)
+  const startEdit = (p) => { setEditId(p.id); setEditName(p.name) }
+  const saveEdit = (p) => {
+    const newName = editName.trim()
+    if (!newName) return show('Enter a name', 2000)
+    if (newName !== p.name) {
+      if (products.list.some(x => x.name.toLowerCase() === newName.toLowerCase() && x.id !== p.id)) return show('That name already exists', 2000)
+      products.update(p.id, { name: newName })
+      // cascade to existing entries + rates so balances/pay stay correct
+      let n = 0
+      dispatches.list.forEach(d => { if (d.productName === p.name) { dispatches.update(d.id, { productName: newName, finishedName: finishedName(newName, d.finish) }); n++ } })
+      rates.list.forEach(r => { if ((r.productName || r.product) === p.name) rates.update(r.id, { productName: newName }) })
+      log('PRODUCT_RENAME', `${p.name} → ${newName} (${n} entries)`, 'owner')
+      show(`Renamed in ${n} entries ✓`)
+    }
+    setEditId(null)
   }
+  // Delete only from edit mode + must type DELETE — a stray tap can't remove it.
+  const del = (p) => { if (confirmDelete(`product "${p.name}"`)) { products.remove(p.id); log('DEL_PRODUCT', p.name, 'owner'); setEditId(null) } }
 
   const rows = [...products.list].sort((a, b) =>
     (a.welder || '').localeCompare(b.welder || '') || (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name))
@@ -213,11 +228,21 @@ function ManageProducts() {
       <div className="space-y-1.5 max-h-80 overflow-auto">
         {rows.map(p => (
           <div key={p.id} className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2">
-            <span className="flex-1 text-sm font-semibold text-slate-700 truncate">{p.name}</span>
-            <button onClick={() => rename(p)} className="text-blue-600 text-xs font-bold px-1">Rename</button>
-            <Select className="!py-1.5 text-xs w-28" value={p.welder || ''} onChange={e => setOwnerFor(p, e.target.value)} options={ownerOpts} />
-            <button onClick={() => togglePlating(p)} title="For plating?" className={`text-xs font-bold px-2 py-1 rounded-lg ${p.noPlating ? 'bg-slate-200 text-slate-500' : 'bg-blue-100 text-blue-700'}`}>{p.noPlating ? 'No plating' : 'Plating'}</button>
-            <button onClick={() => del(p)} className="text-red-500 font-bold px-1">✕</button>
+            {editId === p.id ? (
+              <>
+                <TextInput className="flex-1 !py-1.5" value={editName} onChange={e => setEditName(e.target.value)} />
+                <button onClick={() => saveEdit(p)} className="text-xs font-bold text-white bg-emerald-600 px-2.5 py-1.5 rounded-lg">Save</button>
+                <button onClick={() => del(p)} className="text-xs font-bold text-white bg-red-600 px-2.5 py-1.5 rounded-lg">Delete</button>
+                <button onClick={() => setEditId(null)} className="text-xs font-bold text-slate-500 px-1">Cancel</button>
+              </>
+            ) : (
+              <>
+                <span className="flex-1 text-sm font-semibold text-slate-700 truncate">{p.name}</span>
+                <button onClick={() => startEdit(p)} className="text-blue-600 text-xs font-bold px-1">Edit name</button>
+                <Select className="!py-1.5 text-xs w-28" value={p.welder || ''} onChange={e => setOwnerFor(p, e.target.value)} options={ownerOpts} />
+                <button onClick={() => togglePlating(p)} title="For plating?" className={`text-xs font-bold px-2 py-1 rounded-lg ${p.noPlating ? 'bg-slate-200 text-slate-500' : 'bg-blue-100 text-blue-700'}`}>{p.noPlating ? 'No plating' : 'Plating'}</button>
+              </>
+            )}
           </div>
         ))}
       </div>
@@ -246,7 +271,7 @@ function FilteredDelete() {
 
   const run = () => {
     if (!matches.length) return show('No entries match these filters', 2200)
-    if (!confirm(`Delete ${matches.length} matching entr${matches.length > 1 ? 'ies' : 'y'}? This cannot be undone.`)) return
+    if (!confirmDelete(`${matches.length} matching entr${matches.length > 1 ? 'ies' : 'y'}`)) return
     dispatches.removeWhere(match)
     const f = [from && `from ${from}`, to && `to ${to}`, welderF !== 'all' && welderF, productF !== 'all' && productF, finishF !== 'all' && finishF, partyF !== 'all' && partyF].filter(Boolean).join(', ') || 'all'
     log('DELETE_RANGE', `${matches.length} entries deleted (${f})`, 'owner')
