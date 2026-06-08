@@ -11,7 +11,7 @@
  */
 import { initializeApp, getApp } from 'firebase/app'
 import {
-  initializeFirestore, collection, doc,
+  initializeFirestore, collection, doc, setDoc,
   persistentLocalCache, persistentMultipleTabManager,
 } from 'firebase/firestore'
 import {
@@ -75,6 +75,19 @@ export const platingPaths = db && {
   challan: (id) => doc(db, 'apps', 'platingjobwork', 'challans', id),
   counter: () => doc(db, 'apps', 'platingjobwork', 'meta', 'counter'),
   parties: () => doc(db, 'apps', 'platingjobwork', 'meta', 'parties'),
+  incoming: () => collection(db, 'apps', 'platingjobwork', 'incoming'),
+  incomingDoc: (id) => doc(db, 'apps', 'platingjobwork', 'incoming', id),
+}
+
+/**
+ * Push (or upsert) an "Incoming From Welder" queue item into the Plating app.
+ * Idempotent by the record's id (one per welder challan). This does NOT create a
+ * plating challan — the plating Manager/Owner Accepts it there. Fire-and-forget;
+ * offline writes queue via the local cache and sync on reconnect.
+ */
+export function pushPlatingIncoming(record) {
+  if (!db || !platingPaths || !record?.id) return Promise.resolve()
+  return setDoc(platingPaths.incomingDoc(record.id), record, { merge: true })
 }
 
 export function ensureSignedIn() {

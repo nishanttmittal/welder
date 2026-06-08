@@ -101,6 +101,10 @@ export const DEFAULT_PRODUCTS = [
 export const PLATING_FINISHES = ['chrome', 'gold', 'rosegold']
 export const isPlatingFinish = (key) => PLATING_FINISHES.includes(key)
 
+/** Welder→Plating sync: only challans dated on/after this go to the Plating
+ *  app's Incoming queue (older data already exists there via Excel import). */
+export const PLATING_SYNC_FROM = '2026-06-01'
+
 /** Welder challan prefix from the welder's name, e.g. "Naveen" → "NAV". */
 export const welderPrefix = (name) => ((name || '').replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase() || 'WLD')
 

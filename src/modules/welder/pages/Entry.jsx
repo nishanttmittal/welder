@@ -9,9 +9,10 @@ import { useMemo, useState, useEffect, useRef } from 'react'
 import { Button, Card, FieldLabel, Select, NumberInput, TextInput, useToast, Toast } from '../../../core/ui'
 import { todayStr, daysAgoStr, fmtNum, fmtDate } from '../../../core/utils/format'
 import { useWelder } from '../WelderContext'
-import { FINISHES, finishedName, isPlatingFinish, SOURCE_APP, WORKFLOW_STAGE, DEFAULT_FACTORY_ID } from '../config'
+import { FINISHES, finishedName, isPlatingFinish, SOURCE_APP, WORKFLOW_STAGE, DEFAULT_FACTORY_ID, PLATING_SYNC_FROM } from '../config'
 import { nextWelderChallan, last4 } from '../logic/platingBridge'
 import { makeId } from '../../../core/db/repository'
+import { pushPlatingIncoming } from '../../../core/db/firebase'
 
 export default function Entry({ floor = false, operator = '', by = '' }) {
   const { dispatches, products, welders, parties, platingOutbox, counters, log, lastUsed } = useWelder()
@@ -119,6 +120,19 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
       const existing = platingOutbox.list.find(o => !o.pushed && o.gaadi === gaadi.trim() && o.party === party && o.date === date)
       if (existing) platingOutbox.update(existing.id, { items: [...(existing.items || []), ...its], welderChallans: [...(existing.welderChallans || []), code] })
       else platingOutbox.insert({ date, gaadi: gaadi.trim(), party, items: its, welderChallans: [code], pushed: false, platingChallanNo: '' })
+    }
+    // REAL plating integration: queue an "Incoming From Welder" item in the
+    // Plating app (no challan yet — they Accept it there). Plating finishes only,
+    // dated on/after the cutoff. Idempotent by id (one per welder challan).
+    if (plating && code && platingItems.length && date >= PLATING_SYNC_FROM) {
+      pushPlatingIncoming({
+        id: `feed_${code}`, status: 'pending',
+        date, party, gaadi: gaadi.trim(),
+        items: platingItems.map(it => ({ product: it.product, quantity: Number(it.qty) })),
+        welderChallanNo: code, linkedChallanId: code, batchId,
+        sourceApp: SOURCE_APP, destinationApp: 'platingjobwork', parentTransactionId: '',
+        createdAt: stamp, createdBy,
+      }).catch(() => {})
     }
     log('SENT', `${welder}: ${filled.length} product/s${code ? ' · ' + code : ''} → ${party}${gaadi.trim() ? ' · gaadi …' + last4(gaadi) : ''}`, who)
     lastUsed.set({ ...lastUsed.get(), welder, finish, party })
