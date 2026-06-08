@@ -180,7 +180,7 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
         </div>
         <div>
           <FieldLabel>Gaadi No {plating ? <span className="text-red-400 font-normal normal-case">(required for plating)</span> : <span className="text-slate-400 font-normal normal-case">(optional)</span>}</FieldLabel>
-          <TextInput className="mt-1.5" inputMode="numeric" placeholder="4 digits e.g. 1234" value={gaadi} onChange={e => setGaadi(e.target.value.replace(/\D/g, '').slice(0, 4))} />
+          <TextInput className="mt-1.5 w-32 text-center tracking-widest" inputMode="numeric" placeholder="1234" value={gaadi} onChange={e => setGaadi(e.target.value.replace(/\D/g, '').slice(0, 4))} />
         </div>
       </Card>
 
@@ -188,9 +188,9 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
         <FieldLabel>Products {finish && <span className="text-amber-600 normal-case">→ {FINISHES.find(f => f.key === finish)?.suffix}</span>}</FieldLabel>
         {items.map((it, i) => (
           <div key={i} className="flex gap-1.5 items-center">
-            <Select className="flex-1" value={it.product} onChange={e => setItem(i, { product: e.target.value })} options={prodOpts} />
-            <NumberInput className="w-20 text-center" placeholder="qty" value={it.qty} onChange={e => setItem(i, { qty: e.target.value })} />
-            <button onClick={() => delItem(i)} className="w-9 h-9 rounded-xl bg-red-50 text-red-500 font-bold flex-shrink-0">✕</button>
+            <Select className="flex-1 min-w-0" value={it.product} onChange={e => setItem(i, { product: e.target.value })} options={prodOpts} />
+            <NumberInput className="w-16 text-center flex-shrink-0 !px-2" placeholder="qty" value={it.qty} onChange={e => setItem(i, { qty: e.target.value.replace(/\D/g, '').slice(0, 3) })} />
+            <button onClick={() => delItem(i)} className="w-8 h-8 rounded-xl bg-red-50 text-red-500 font-bold flex-shrink-0">✕</button>
           </div>
         ))}
         <Button variant="neutral" className="w-full" onClick={addItem}>+ Add product</Button>

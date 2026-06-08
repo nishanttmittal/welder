@@ -8,10 +8,13 @@ import { Button, Card, FieldLabel, TextInput, Select, useToast, Toast } from '..
 import { useWelder } from '../WelderContext'
 import { OWNER_EMAILS, FINISHES, finishedName } from '../config'
 
-/** Reusable add/list/delete for a simple {name} collection. */
-function ManageList({ title, repo, hint, log, logKey }) {
+/** Reusable add/edit/delete for a simple {name} collection. Edit name (with
+ *  optional cascade to entries) + type-to-DELETE; no stray ✕. */
+function ManageList({ title, repo, hint, log, logKey, onRename }) {
   const { msg, show } = useToast()
   const [name, setName] = useState('')
+  const [editId, setEditId] = useState(null)
+  const [editName, setEditName] = useState('')
   const add = () => {
     const nm = name.trim()
     if (!nm) return show('Enter a name', 2000)
@@ -19,7 +22,19 @@ function ManageList({ title, repo, hint, log, logKey }) {
     repo.insert({ name: nm, order: repo.list.length })
     log(`ADD_${logKey}`, nm, 'admin'); show('Added ✓'); setName('')
   }
-  const del = (x) => { if (confirm(`Delete "${x.name}"?`)) { repo.remove(x.id); log(`DEL_${logKey}`, x.name, 'admin') } }
+  const startEdit = (x) => { setEditId(x.id); setEditName(x.name) }
+  const saveEdit = (x) => {
+    const nm = editName.trim()
+    if (!nm) return show('Enter a name', 2000)
+    if (nm !== x.name) {
+      if (repo.list.some(y => y.name.toLowerCase() === nm.toLowerCase() && y.id !== x.id)) return show('Already exists', 2000)
+      repo.update(x.id, { name: nm })
+      const n = onRename ? onRename(x.name, nm) : 0
+      log(`EDIT_${logKey}`, `${x.name} → ${nm}${n ? ` (${n} entries)` : ''}`, 'admin'); show('Renamed ✓')
+    }
+    setEditId(null)
+  }
+  const del = (x) => { if (confirmDelete(`${title.toLowerCase().replace(/s$/, '')} "${x.name}"`)) { repo.remove(x.id); log(`DEL_${logKey}`, x.name, 'admin'); setEditId(null) } }
   return (
     <Card className="p-5 space-y-3">
       <Toast msg={msg} />
@@ -29,11 +44,26 @@ function ManageList({ title, repo, hint, log, logKey }) {
         <TextInput placeholder={`New ${title.toLowerCase()}`} value={name} onChange={e => setName(e.target.value)} />
         <Button variant="primary" onClick={add}>Add</Button>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="space-y-1.5 max-h-72 overflow-auto">
         {[...repo.list].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map(x => (
-          <span key={x.id} className="inline-flex items-center gap-1.5 bg-slate-100 rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-700">
-            {x.name}<button onClick={() => del(x)} className="text-red-500 font-bold">✕</button>
-          </span>
+          <div key={x.id} className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2">
+            {editId === x.id ? (
+              <>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[10px] text-slate-400 truncate">editing: <b>{x.name}</b></div>
+                  <TextInput className="!py-1.5 mt-0.5" value={editName} onChange={e => setEditName(e.target.value)} />
+                </div>
+                <button onClick={() => saveEdit(x)} className="text-xs font-bold text-white bg-emerald-600 px-2.5 py-1.5 rounded-lg">Save</button>
+                <button onClick={() => del(x)} className="text-xs font-bold text-white bg-red-600 px-2.5 py-1.5 rounded-lg">Delete</button>
+                <button onClick={() => setEditId(null)} className="text-xs font-bold text-slate-500 px-1">Cancel</button>
+              </>
+            ) : (
+              <>
+                <span className="flex-1 text-sm font-semibold text-slate-700 truncate">{x.name}</span>
+                <button onClick={() => startEdit(x)} className="text-blue-600 text-xs font-bold px-1">Edit</button>
+              </>
+            )}
+          </div>
         ))}
       </div>
     </Card>
@@ -77,10 +107,6 @@ function DataTools() {
     if (!confirmDelete('ALL dispatch entries')) return
     await dispatches.reset(); log('RESET', 'Cleared dispatches', 'admin'); show('Cleared ✓')
   }
-  const clearOutbox = async () => {
-    if (!confirmDelete('the Plating Outbox list')) return
-    await platingOutbox.reset(); log('RESET', 'Cleared plating outbox', 'admin'); show('Outbox cleared ✓')
-  }
   return (
     <Card className="p-5 space-y-3">
       <Toast msg={msg} />
@@ -91,7 +117,6 @@ function DataTools() {
         <Button variant="neutral" onClick={() => fileRef.current?.click()}>⬆ Restore</Button>
       </div>
       <input ref={fileRef} type="file" accept="application/json" className="hidden" onChange={restore} />
-      <Button variant="neutral" className="w-full" onClick={clearOutbox}>🧹 Clear Plating Outbox list</Button>
       <Button variant="danger" className="w-full" onClick={resetDispatches}>Clear ALL dispatches (type DELETE)</Button>
       <p className="text-[11px] text-slate-400">Deletes ask you to type DELETE first, so a stray tap can’t wipe data. For precise removal use “Delete Entries (filtered)” above.</p>
     </Card>
@@ -230,7 +255,10 @@ function ManageProducts() {
           <div key={p.id} className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2">
             {editId === p.id ? (
               <>
-                <TextInput className="flex-1 !py-1.5" value={editName} onChange={e => setEditName(e.target.value)} />
+                <div className="flex-1 min-w-0">
+                  <div className="text-[10px] text-slate-400 truncate">editing: <b>{p.name}</b></div>
+                  <TextInput className="!py-1.5 mt-0.5" value={editName} onChange={e => setEditName(e.target.value)} />
+                </div>
                 <button onClick={() => saveEdit(p)} className="text-xs font-bold text-white bg-emerald-600 px-2.5 py-1.5 rounded-lg">Save</button>
                 <button onClick={() => del(p)} className="text-xs font-bold text-white bg-red-600 px-2.5 py-1.5 rounded-lg">Delete</button>
                 <button onClick={() => setEditId(null)} className="text-xs font-bold text-slate-500 px-1">Cancel</button>
@@ -299,13 +327,15 @@ function FilteredDelete() {
 }
 
 export default function Admin() {
-  const { welders, parties, log } = useWelder()
+  const { welders, parties, dispatches, log } = useWelder()
+  const renameWelder = (oldN, newN) => { let n = 0; dispatches.list.forEach(d => { if (d.welder === oldN) { dispatches.update(d.id, { welder: newN }); n++ } }); return n }
+  const renameParty = (oldN, newN) => { let n = 0; dispatches.list.forEach(d => { if (d.party === oldN) { dispatches.update(d.id, { party: newN }); n++ } }); return n }
   return (
     <div className="max-w-lg mx-auto p-4 space-y-4">
       <ManageUsers />
       <ManageProducts />
-      <ManageList title="Welders" repo={welders} log={log} logKey="WELDER" />
-      <ManageList title="Parties" repo={parties} log={log} logKey="PARTY" hint="Where material is sent: job-work persons / departments." />
+      <ManageList title="Welders" repo={welders} log={log} logKey="WELDER" onRename={renameWelder} />
+      <ManageList title="Parties" repo={parties} log={log} logKey="PARTY" hint="Where material is sent: job-work persons / departments." onRename={renameParty} />
       <FilteredDelete />
       <DataTools />
       <Logs />
