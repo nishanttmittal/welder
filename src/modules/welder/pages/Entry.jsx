@@ -24,7 +24,7 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
   const [finish, setFinish] = useState(remembered.finish || 'chrome')
   const [party, setParty] = useState(remembered.party || FINISHES.find(f => f.key === (remembered.finish || 'chrome'))?.defaultParty || '')
   const [gaadi, setGaadi] = useState('')
-  const [items, setItems] = useState([{ product: '', qty: '' }, { product: '', qty: '' }, { product: '', qty: '' }])
+  const [items, setItems] = useState([{ product: '', qty: '' }])
   const [confirming, setConfirming] = useState(false)
   const [dupWarn, setDupWarn] = useState('') // products already entered today for this gaadi
   const [saving, setSaving] = useState(false)
@@ -137,11 +137,11 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
     log('SENT', `${welder}: ${filled.length} product/s${code ? ' · ' + code : ''} → ${party}${gaadi.trim() ? ' · gaadi …' + last4(gaadi) : ''}`, who)
     lastUsed.set({ ...lastUsed.get(), welder, finish, party })
     show(`Saved ${filled.length} product/s${code ? ' · ' + code : ''} ✓`)
-    setItems([{ product: '', qty: '' }, { product: '', qty: '' }, { product: '', qty: '' }]); setGaadi('')
+    setItems([{ product: '', qty: '' }]); setGaadi('')
   }
 
   return (
-    <div className="max-w-lg mx-auto p-4 space-y-4">
+    <div className={`max-w-lg mx-auto p-4 space-y-4 ${floor ? 'pb-28' : ''}`}>
       <Toast msg={msg} />
 
       <Card className="p-4 space-y-3">
@@ -196,9 +196,20 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
         <Button variant="neutral" className="w-full" onClick={addItem}>+ Add product</Button>
       </Card>
 
-      <Button variant="primary" size="lg" className="w-full text-lg py-5 !bg-amber-600 !shadow-amber-300" onClick={requestSave}>
-        SAVE{filled.length > 0 ? ` · ${filled.length} product/s · ${fmtNum(totalQty)} pcs` : ''}
-      </Button>
+      {floor ? (
+        // Shop floor: SAVE pinned to the bottom so it's always reachable.
+        <div className="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur border-t border-slate-200 px-4 pt-3 z-20 no-print" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
+          <div className="max-w-lg mx-auto">
+            <Button variant="primary" size="lg" className="w-full text-lg py-4 !bg-amber-600 !shadow-amber-300" onClick={requestSave}>
+              SAVE{filled.length > 0 ? ` · ${filled.length} product/s · ${fmtNum(totalQty)} pcs` : ''}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button variant="primary" size="lg" className="w-full text-lg py-5 !bg-amber-600 !shadow-amber-300" onClick={requestSave}>
+          SAVE{filled.length > 0 ? ` · ${filled.length} product/s · ${fmtNum(totalQty)} pcs` : ''}
+        </Button>
+      )}
 
       <Card className="p-5">
         <div className="flex items-center justify-between mb-3">
