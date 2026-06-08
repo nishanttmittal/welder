@@ -62,6 +62,10 @@ export const paths = {
   ledgerDoc: (id) => cdoc('ledger', id),
   users: () => coll('users'),
   user: (id) => cdoc('users', id),
+  components: () => coll('components'),
+  component: (id) => cdoc('components', id),
+  receipts: () => coll('receipts'),
+  receipt: (id) => cdoc('receipts', id),
 }
 
 /**

@@ -4,7 +4,7 @@
  */
 import { createCollection, createSingleton, makeId } from '../../core/db/repository'
 import { makeNormalizer } from '../../core/schema/field'
-import { dispatchSchema, productSchema, welderSchema, partySchema, platingOutboxSchema, rateSchema, paymentSchema, ledgerSchema, userSchema } from './schema'
+import { dispatchSchema, productSchema, welderSchema, partySchema, platingOutboxSchema, rateSchema, paymentSchema, ledgerSchema, userSchema, componentSchema, receiptSchema } from './schema'
 import { KEYS, DEFAULT_PRODUCTS, DEFAULT_WELDERS, DEFAULT_PARTIES } from './config'
 
 export const dispatchesRepo = createCollection(KEYS.dispatches, {
@@ -50,6 +50,16 @@ export const ledgerRepo = createCollection(KEYS.ledger, {
 export const usersRepo = createCollection(KEYS.users, {
   seed: () => [],
   normalize: makeNormalizer(userSchema),
+})
+
+export const componentsRepo = createCollection(KEYS.components, {
+  seed: () => [],
+  normalize: makeNormalizer(componentSchema),
+})
+
+export const receiptsRepo = createCollection(KEYS.receipts, {
+  seed: () => [],
+  normalize: makeNormalizer(receiptSchema),
 })
 
 export const logsRepo = createCollection(KEYS.logs, { seed: () => [] })

@@ -10,6 +10,8 @@ import Entry from './pages/Entry'
 import PlatingOutbox from './pages/PlatingOutbox'
 import ContractorPay from './pages/ContractorPay'
 import Ledger from './pages/Ledger'
+import RawMaterialStock from './pages/RawMaterialStock'
+import MaterialsRecipe from './pages/MaterialsRecipe'
 import Dashboard from './pages/Dashboard'
 import History from './pages/History'
 import Export from './pages/Export'
@@ -52,6 +54,8 @@ export const welderModule = {
     { key: 'ledger',    title: 'Contractor Ledger', desc: 'Running balance, advances, settlement', icon: '📒', color: 'from-teal-600 to-teal-700', roles: ['incharge', 'owner'], Component: Ledger },
     { key: 'dashboard', title: 'Dashboard',      desc: 'Daily totals, by welder & party',      icon: '📊', color: 'from-blue-600 to-blue-700',   roles: ['incharge', 'owner'], Component: Dashboard },
     { key: 'export',    title: 'Export / Share', desc: 'Daily PDF report for WhatsApp',         icon: '📄', color: 'from-violet-600 to-violet-700', roles: ['incharge', 'owner'], Component: Export },
+    { key: 'stock',     title: 'Raw Material Stock', desc: 'Balance + add incoming stock',      icon: '📦', color: 'from-cyan-600 to-cyan-700',   roles: ['incharge', 'owner'], Component: RawMaterialStock },
+    { key: 'materials', title: 'Materials & Recipe', desc: 'Raw materials + product recipes',   icon: '🧪', color: 'from-indigo-600 to-indigo-700', roles: ['owner'], Component: MaterialsRecipe },
     { key: 'outbox',    title: 'Plating Outbox', desc: 'Challans ready for the Plating app',    icon: '📤', color: 'from-blue-600 to-blue-700',   roles: ['owner'], Component: PlatingOutbox },
     { key: 'admin',     title: 'Admin',          desc: 'Rates, users, products, backup',       icon: '⚙️', color: 'from-slate-600 to-slate-700', roles: ['owner'], Component: Admin },
   ],

@@ -121,4 +121,6 @@ export const KEYS = {
   payments:     'payments',
   ledger:       'ledger',
   users:        'users',
+  components:   'components',
+  receipts:     'receipts',
 }

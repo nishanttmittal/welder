@@ -74,6 +74,38 @@ export const productSchema = [
   field({ name: 'name',      label: 'Product',         type: 'text',   default: '', required: true }),
   field({ name: 'welder',    label: 'Belongs to',      type: 'text',   default: '' }),     // '' = common
   field({ name: 'noPlating', label: 'Not for plating', type: 'toggle', default: false }),
+  // recipe: [{ componentId, qty }] — raw materials per ONE finished piece.
+  field({ name: 'recipe',    label: 'Recipe',          type: 'list',   default: () => [] }),
+]
+
+/**
+ * Raw material (component) used to make welded products. Measured by 'number'
+ * (pieces) or 'weight' (entered by weight, converted to pieces via avgWeight).
+ * Stock is ALWAYS kept in pieces (weight shown as an equivalent).
+ */
+export const componentSchema = [
+  field({ name: 'name',         label: 'Raw material', type: 'text',   default: '', required: true }),
+  field({ name: 'category',     label: 'Category',     type: 'text',   default: '' }),
+  field({ name: 'measureBy',    label: 'Measured by',  type: 'select', default: 'number',
+          options: [{ value: 'number', label: 'Number (pieces)' }, { value: 'weight', label: 'Weight' }] }),
+  field({ name: 'avgWeight',    label: 'Avg weight per piece', type: 'number', default: 0 }),
+  field({ name: 'weightUnit',   label: 'Weight unit',  type: 'text',   default: 'kg' }),
+  field({ name: 'reorderLevel', label: 'Reorder level (pcs)', type: 'number', default: 0 }),
+  field({ name: 'unitCost',     label: 'Cost / piece (₹)', type: 'number', default: 0 }),
+  field({ name: 'supplierName', label: 'Supplier',     type: 'text',   default: '' }),
+]
+
+/** Raw material coming IN (stock receipt). Stock kept in pieces; weight stored too. */
+export const receiptSchema = [
+  field({ name: 'date',          label: 'Date',      type: 'date',   default: todayStr, required: true }),
+  field({ name: 'componentId',   label: 'Material',  type: 'text',   default: '', required: true }),
+  field({ name: 'componentName', label: 'Material',  type: 'text',   default: '' }),
+  field({ name: 'qty',           label: 'Pieces',    type: 'number', default: 0 }),
+  field({ name: 'weight',        label: 'Weight',    type: 'number', default: 0 }),
+  field({ name: 'avgWeightUsed', label: 'Lot avg wt', type: 'number', default: 0 }),
+  field({ name: 'enteredAs',     label: 'Entered as', type: 'text',   default: 'number' }), // number | weight
+  field({ name: 'by',            label: 'By',        type: 'text',   default: '' }),
+  field({ name: 'note',          label: 'Note',      type: 'text',   default: '' }),
 ]
 
 /**
