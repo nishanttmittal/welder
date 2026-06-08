@@ -136,7 +136,7 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
         items: platingItems.map(it => ({ product: it.product, quantity: Number(it.qty) })),
         welderChallanNo: code, linkedChallanId: code, batchId,
         sourceApp: SOURCE_APP, destinationApp: 'platingjobwork', parentTransactionId: '',
-        createdAt: stamp, createdBy,
+        createdAt: stamp, createdBy: who,
       }).catch(() => {})
     }
     log('SENT', `${welder}: ${filled.length} product/s${code ? ' · ' + code : ''} → ${party}${gaadi.trim() ? ' · gaadi …' + last4(gaadi) : ''}`, who)
