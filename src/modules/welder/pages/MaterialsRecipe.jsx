@@ -159,7 +159,7 @@ function RecipeEditor({ product, components, onCancel, onSave }) {
           {selected.map(c => (
             <div key={c.id} className="flex items-center gap-2">
               <span className="flex-1 text-sm font-semibold text-slate-700 truncate">{c.name}</span>
-              <NumberInput className="!w-16 text-center !py-1 !px-2" inputMode="decimal" step="0.001" value={recipe[c.id]} onChange={e => setVal(c.id, e.target.value)} />
+              <NumberInput className="!w-16 text-center !py-1 !px-2" inputMode="numeric" value={recipe[c.id]} onChange={e => setVal(c.id, e.target.value.replace(/[^\d]/g, ''))} />
               <span className="text-[11px] text-slate-400">/pc</span>
               <button onClick={() => remove(c.id)} className="text-red-500 font-bold px-1 flex-shrink-0">✕</button>
             </div>

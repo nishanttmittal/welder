@@ -11,11 +11,12 @@ import { todayStr, daysAgoStr, fmtNum, fmtDate } from '../../../core/utils/forma
 import { useWelder } from '../WelderContext'
 import { FINISHES, finishedName, isPlatingFinish, SOURCE_APP, WORKFLOW_STAGE, DEFAULT_FACTORY_ID, PLATING_SYNC_FROM } from '../config'
 import { nextWelderChallan, last4 } from '../logic/platingBridge'
+import { computeStock, recipeOf } from '../logic/stock'
 import { makeId } from '../../../core/db/repository'
 import { pushPlatingIncoming } from '../../../core/db/firebase'
 
 export default function Entry({ floor = false, operator = '', by = '' }) {
-  const { dispatches, products, welders, parties, counters, log, lastUsed } = useWelder()
+  const { dispatches, products, welders, parties, components, receipts, adjustments, counters, log, lastUsed } = useWelder()
   const { msg, show } = useToast()
   const remembered = lastUsed.get()
 
@@ -27,6 +28,7 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
   const [items, setItems] = useState([{ product: '', qty: '' }])
   const [confirming, setConfirming] = useState(false)
   const [dupWarn, setDupWarn] = useState('') // products already entered today for this gaadi
+  const [stockWarn, setStockWarn] = useState('') // materials that would go short (non-blocking)
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false) // hard guard against a fast double-tap on Save
   const [fixing, setFixing] = useState(null)
@@ -83,6 +85,18 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
     const g = gaadi.trim()
     const dups = g ? filled.filter(it => dispatches.list.some(d => d.date === date && (d.gaadi || '') === g && d.productName === it.product && Number(d.qty) > 0)).map(it => it.product) : []
     setDupWarn(dups.join(', '))
+    // Insufficient-stock warning (non-blocking): does this production drop any
+    // raw material below zero? Sum the recipe need across all lines first.
+    const stock = computeStock(components.list, receipts.list, dispatches.list, products.list, adjustments.list)
+    const need = {}
+    filled.forEach(it => {
+      const p = products.list.find(x => x.name === it.product)
+      recipeOf(p).forEach(r => { need[r.componentId] = (need[r.componentId] || 0) + Number(r.qty) * Number(it.qty) })
+    })
+    const short = Object.entries(need)
+      .filter(([cid, q]) => stock[cid] && (stock[cid].stock - q) < 0)
+      .map(([cid, q]) => `${stock[cid].name} (have ${fmtNum(stock[cid].stock)}, need ${fmtNum(q)})`)
+    setStockWarn(short.join(' · '))
     savingRef.current = false; setSaving(false) // fresh attempt
     setConfirming(true)
   }
@@ -261,6 +275,11 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
             {dupWarn && (
               <div className="bg-red-50 border-2 border-red-300 rounded-xl p-3 text-sm text-red-700 font-semibold">
                 ⚠ Already entered today for gaadi {gaadi.trim()}: <b>{dupWarn}</b>. This may be a double entry — save again only if it's really a new load.
+              </div>
+            )}
+            {stockWarn && (
+              <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-3 text-sm text-amber-700 font-semibold">
+                ⚠ Insufficient stock: {stockWarn}. You can still save (not blocked) — but check the raw material.
               </div>
             )}
             <div className="text-sm text-slate-500">

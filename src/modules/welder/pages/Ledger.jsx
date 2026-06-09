@@ -46,6 +46,8 @@ export default function Ledger({ owner = false, by = 'owner' }) {
   const [to, setTo] = useState(todayStr())
   const mgrMinDate = owner ? undefined : managerFloorDate()
   const mgrMinMonth = owner ? undefined : managerFloorDate().slice(0, 7)
+  const mgrMaxDate = owner ? undefined : todayStr()
+  const mgrMaxMonth = owner ? undefined : todayStr().slice(0, 7)
   const [form, setForm] = useState(null)                    // { type, dir } when adding
   const [editPay, setEditPay] = useState(null)              // payment record being edited
 
@@ -147,12 +149,12 @@ export default function Ledger({ owner = false, by = 'owner' }) {
           ))}
         </div>
         {mode === 'month'
-          ? <input type="month" value={month} min={mgrMinMonth} onChange={e => setMonth(e.target.value)} className="w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold" />
+          ? <input type="month" value={month} min={mgrMinMonth} max={mgrMaxMonth} onChange={e => setMonth(e.target.value)} className="w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold" />
           : <div className="grid grid-cols-2 gap-2">
-              <div><FieldLabel>From</FieldLabel><DateInput className="mt-1" value={from} min={mgrMinDate} onChange={e => setFrom(e.target.value)} /></div>
-              <div><FieldLabel>To</FieldLabel><DateInput className="mt-1" value={to} min={mgrMinDate} onChange={e => setTo(e.target.value)} /></div>
+              <div><FieldLabel>From</FieldLabel><DateInput className="mt-1" value={from} min={mgrMinDate} max={mgrMaxDate} onChange={e => setFrom(e.target.value)} /></div>
+              <div><FieldLabel>To</FieldLabel><DateInput className="mt-1" value={to} min={mgrMinDate} max={mgrMaxDate} onChange={e => setTo(e.target.value)} /></div>
             </div>}
-        {!owner && <p className="text-[10px] text-slate-400">Manager view: last {MANAGER_HISTORY_MONTHS} months</p>}
+        {!owner && <p className="text-[10px] text-slate-400">Manager view: this month + last {MANAGER_HISTORY_MONTHS} months</p>}
         <div className="grid grid-cols-2 gap-2">
           <Button size="sm" variant="neutral" onClick={exportLedgerPDF}>📄 Ledger PDF</Button>
           <Button size="sm" variant="neutral" onClick={exportSettlementPDF}>🧾 Settlement PDF</Button>

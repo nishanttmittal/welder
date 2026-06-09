@@ -72,6 +72,50 @@ export function computeStock(components, receipts, dispatches, products, adjustm
   return map
 }
 
+/**
+ * Immutable stock transaction log — DERIVED from the source records, never a
+ * mutable stored balance. Every movement becomes one entry:
+ *   INCOMING (receipts) · AUTO_DEDUCT (production × recipe) · MANUAL_ADJUSTMENT
+ *   (set-offs). Sum of qty per material === current stock.
+ * Fields: material, qty (+in/−out), unit, transactionType, referenceProduct,
+ *   referenceChallan, createdBy, createdAt, remark.
+ */
+export function stockTransactions(components, receipts, dispatches, products, adjustments = []) {
+  const compById = Object.fromEntries(components.map(c => [c.id, c]))
+  const prodByName = {}; for (const p of products) prodByName[p.name] = p
+  const txns = []
+  for (const r of receipts) {
+    const c = compById[r.componentId]
+    txns.push({
+      id: `in_${r.id}`, materialId: r.componentId, material: r.componentName || c?.name || '??',
+      qty: num(r.qty), unit: 'pcs', transactionType: 'INCOMING', referenceProduct: '', referenceChallan: '',
+      createdBy: r.by || '', createdAt: r.createdAt || r.date || '', remark: r.note || (r.flagged ? '⚑ avg-wt flagged' : ''),
+    })
+  }
+  for (const d of dispatches) {
+    if (!(num(d.qty) > 0)) continue
+    const p = prodByName[d.productName]; if (!p) continue
+    for (const r of recipeOf(p)) {
+      const c = compById[r.componentId]; if (!c) continue
+      txns.push({
+        id: `de_${d.id}_${r.componentId}`, materialId: r.componentId, material: c.name,
+        qty: -(num(r.qty) * num(d.qty)), unit: 'pcs', transactionType: 'AUTO_DEDUCT',
+        referenceProduct: d.productName, referenceChallan: d.welderChallan || '',
+        createdBy: d.createdByRole || d.welder || '', createdAt: d.createdAt || d.date || '', remark: '',
+      })
+    }
+  }
+  for (const a of adjustments) {
+    const c = compById[a.componentId]
+    txns.push({
+      id: `ad_${a.id}`, materialId: a.componentId, material: a.componentName || c?.name || '??',
+      qty: num(a.delta), unit: 'pcs', transactionType: 'MANUAL_ADJUSTMENT', referenceProduct: '', referenceChallan: '',
+      createdBy: a.by || '', createdAt: a.createdAt || a.date || '', remark: a.reason || '',
+    })
+  }
+  return txns.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+}
+
 /** Materials at/below reorder level or negative — "order now", most urgent first. */
 export function reorderList(stockMap) {
   return Object.values(stockMap)

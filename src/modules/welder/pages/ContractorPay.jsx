@@ -51,6 +51,8 @@ export default function ContractorPay({ owner = false, by = 'owner' }) {
 
   const mgrMinDate = owner ? undefined : managerFloorDate()
   const mgrMinMonth = owner ? undefined : managerFloorDate().slice(0, 7)
+  const mgrMaxDate = owner ? undefined : todayStr()                 // no future for manager
+  const mgrMaxMonth = owner ? undefined : todayStr().slice(0, 7)
   const from = mode === 'day' ? day : `${month}-01`
   const to   = mode === 'day' ? day : `${month}-31`
   const periodLabel = mode === 'day' ? fmtDate(day) : month
@@ -159,9 +161,9 @@ export default function ContractorPay({ owner = false, by = 'owner' }) {
           <div>
             <FieldLabel>{mode === 'day' ? 'Date' : 'Month'}</FieldLabel>
             {mode === 'day'
-              ? <DateInput className="mt-1" value={day} min={mgrMinDate} onChange={e => setDay(e.target.value)} />
-              : <input type="month" value={month} min={mgrMinMonth} onChange={e => setMonth(e.target.value)} className="mt-1 w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold" />}
-            {!owner && <p className="text-[10px] text-slate-400 mt-1">Manager view: last {MANAGER_HISTORY_MONTHS} months</p>}
+              ? <DateInput className="mt-1" value={day} min={mgrMinDate} max={mgrMaxDate} onChange={e => setDay(e.target.value)} />
+              : <input type="month" value={month} min={mgrMinMonth} max={mgrMaxMonth} onChange={e => setMonth(e.target.value)} className="mt-1 w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold" />}
+            {!owner && <p className="text-[10px] text-slate-400 mt-1">Manager view: this month + last {MANAGER_HISTORY_MONTHS} months</p>}
           </div>
           <div><FieldLabel>Contractor</FieldLabel>
             <Select className="mt-1" value={filter} onChange={e => setFilter(e.target.value)} options={[{ value: '', label: 'All' }, ...welders.list.map(w => ({ value: w.name, label: w.name }))]} /></div>

@@ -52,6 +52,12 @@ export const AVG_WEIGHT_TOLERANCE_PCT = 1
 /** Manager can view Contractor Pay & Ledger only this many months back. */
 export const MANAGER_HISTORY_MONTHS = 2
 
+/** Preset reasons for a stock set-off / adjustment. */
+export const STOCK_ADJUST_REASONS = ['Damaged', 'Scrap', 'Physical count mismatch', 'Testing']
+
+/** Raw-material stock transaction types (immutable, derived log). */
+export const STOCK_TXN = { INCOMING: 'INCOMING', AUTO_DEDUCT: 'AUTO_DEDUCT', MANUAL_ADJUSTMENT: 'MANUAL_ADJUSTMENT', CORRECTION: 'CORRECTION' }
+
 /**
  * Finishes a welded product can be sent for. The finish is appended AFTER the
  * product name (e.g. "Spider Chrome"). Default party is a hint for the entry
