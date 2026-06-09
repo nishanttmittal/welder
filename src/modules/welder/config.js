@@ -68,12 +68,16 @@ export const FINISHES = [
   { key: 'powder',   label: 'Powder',    suffix: 'Powder',    defaultParty: 'Powder Coating Dept' },
   { key: 'gold',     label: 'Gold',      suffix: 'Gold',      defaultParty: 'JP Metal Works' },
   { key: 'rosegold', label: 'Rose Gold', suffix: 'Rose Gold', defaultParty: 'JP Metal Works' },
+  // Raw / no finish: product is dispatched AS-IS to a client (no plating, no
+  // suffix). Does NOT flow to the Plating app.
+  { key: 'raw',      label: 'Raw (no finish)', suffix: '',    defaultParty: '' },
 ]
 
-/** Finished product name = base + finish suffix (after the name). */
+/** Finished product name = base + finish suffix (after the name). Raw/no-suffix
+ *  finishes keep the base name unchanged. */
 export const finishedName = (base, finishKey) => {
   const f = FINISHES.find(x => x.key === finishKey)
-  return f ? `${base} ${f.suffix}` : base
+  return f && f.suffix ? `${base} ${f.suffix}` : base
 }
 
 /**

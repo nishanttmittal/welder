@@ -203,7 +203,7 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
         {items.map((it, i) => (
           <div key={i} className="flex gap-1.5 items-center">
             <div className="flex-1 min-w-0"><Select className="!w-full" value={it.product} onChange={e => setItem(i, { product: e.target.value })} options={prodOpts} /></div>
-            <NumberInput className="!w-16 text-center flex-shrink-0 !px-2" placeholder="qty" value={it.qty} onChange={e => setItem(i, { qty: e.target.value.replace(/\D/g, '').slice(0, 3) })} />
+            <NumberInput className="!w-20 text-center flex-shrink-0 !px-2" placeholder="qty" value={it.qty} onChange={e => setItem(i, { qty: e.target.value.replace(/\D/g, '').slice(0, 4) })} />
             <button onClick={() => delItem(i)} className="w-8 h-8 rounded-xl bg-red-50 text-red-500 font-bold flex-shrink-0">✕</button>
           </div>
         ))}

@@ -11,7 +11,7 @@
  */
 import { initializeApp, getApp } from 'firebase/app'
 import {
-  initializeFirestore, collection, doc, setDoc,
+  initializeFirestore, collection, doc, setDoc, getDocs,
   persistentLocalCache, persistentMultipleTabManager,
 } from 'firebase/firestore'
 import {
@@ -94,6 +94,16 @@ export const platingPaths = db && {
 export function pushPlatingIncoming(record) {
   if (!db || !platingPaths || !record?.id) return Promise.resolve()
   return setDoc(platingPaths.incomingDoc(record.id), record, { merge: true })
+}
+
+/** Ids of incoming docs that ALREADY exist in the Plating app — so a re-sync
+ *  can skip them and never revert an accepted/rejected one back to pending. */
+export async function listPlatingIncomingIds() {
+  if (!db || !platingPaths) return new Set()
+  try {
+    const snap = await getDocs(platingPaths.incoming())
+    return new Set(snap.docs.map(d => d.id))
+  } catch { return new Set() }
 }
 
 export function ensureSignedIn() {
