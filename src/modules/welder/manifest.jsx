@@ -44,15 +44,16 @@ export const welderModule = {
   floorLabel: 'Welder',
   floorIcon: '👷',
   // roles: who sees the page in their console (welders/staff use the floor entry).
-  //  • Manager (incharge) + Owner: entry, history, pay, ledger, dashboard, export.
-  //  • Owner only: plating outbox + admin (rates/users/backup/reset).
+  //  • Manager (incharge) + Owner: entry, history, pay, ledger, dashboard.
+  //  • Owner (admin) only: export/share, materials, plating outbox + admin
+  //    (rates/users/backup/reset).
   pages: [
     { key: 'entry',     title: 'Material Sent',  desc: 'Gaadi + add products → save',           icon: '➕', color: 'from-amber-600 to-amber-700', floor: true, roles: ['incharge', 'owner'], Component: Entry },
     { key: 'history',   title: 'Entries',        desc: 'View & correct entries (48h window)',   icon: '🗂️', color: 'from-amber-500 to-amber-600', roles: ['incharge', 'owner'], Component: History },
     { key: 'pay',       title: 'Contractor Pay', desc: 'Piece-rate earnings & statements',      icon: '💰', color: 'from-emerald-600 to-emerald-700', roles: ['incharge', 'owner'], Component: ContractorPay },
     { key: 'ledger',    title: 'Contractor Ledger', desc: 'Running balance, advances, settlement', icon: '📒', color: 'from-teal-600 to-teal-700', roles: ['incharge', 'owner'], Component: Ledger },
     { key: 'dashboard', title: 'Dashboard',      desc: 'Daily totals, by welder & party',      icon: '📊', color: 'from-blue-600 to-blue-700',   roles: ['incharge', 'owner'], Component: Dashboard },
-    { key: 'export',    title: 'Export / Share', desc: 'Daily PDF report for WhatsApp',         icon: '📄', color: 'from-violet-600 to-violet-700', roles: ['incharge', 'owner'], Component: Export },
+    { key: 'export',    title: 'Export / Share', desc: 'Daily PDF report for WhatsApp',         icon: '📄', color: 'from-violet-600 to-violet-700', roles: ['owner'], Component: Export },
     { key: 'stock',     title: 'Raw Material Stock', desc: 'Balance + add incoming stock',      icon: '📦', color: 'from-cyan-600 to-cyan-700',   roles: ['incharge', 'owner'], Component: RawMaterialStock },
     { key: 'materials', title: 'Materials & Recipe', desc: 'Raw materials + product recipes',   icon: '🧪', color: 'from-indigo-600 to-indigo-700', roles: ['owner'], Component: MaterialsRecipe },
     { key: 'admin',     title: 'Admin',          desc: 'Rates, users, products, backup',       icon: '⚙️', color: 'from-slate-600 to-slate-700', roles: ['owner'], Component: Admin },

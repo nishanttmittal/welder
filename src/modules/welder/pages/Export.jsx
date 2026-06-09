@@ -1,7 +1,7 @@
 /**
  * Export / Share — flexible dispatch report PDF for WhatsApp. Group by product,
  * contractor, surface finish, party (or finish → person), over a date range,
- * with optional filters. Manager + Owner.
+ * with optional filters. Owner (admin) only.
  */
 import { useState } from 'react'
 import { Button, Card, FieldLabel, Select, useToast, Toast } from '../../../core/ui'
