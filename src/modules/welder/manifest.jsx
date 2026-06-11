@@ -9,6 +9,7 @@ import { INCHARGE_LABEL } from './config'
 import Entry from './pages/Entry'
 import ContractorPay from './pages/ContractorPay'
 import Ledger from './pages/Ledger'
+import Advances from './pages/Advances'
 import RawMaterialStock from './pages/RawMaterialStock'
 import MaterialsRecipe from './pages/MaterialsRecipe'
 import Dashboard from './pages/Dashboard'
@@ -52,6 +53,7 @@ export const welderModule = {
     { key: 'history',   title: 'Entries',        desc: 'View & correct entries (48h window)',   icon: '🗂️', color: 'from-amber-500 to-amber-600', roles: ['incharge', 'owner'], Component: History },
     { key: 'pay',       title: 'Contractor Pay', desc: 'Piece-rate earnings & statements',      icon: '💰', color: 'from-emerald-600 to-emerald-700', roles: ['incharge', 'owner'], Component: ContractorPay },
     { key: 'ledger',    title: 'Contractor Ledger', desc: 'Running balance, advances, settlement', icon: '📒', color: 'from-teal-600 to-teal-700', roles: ['incharge', 'owner'], Component: Ledger },
+    { key: 'advances',  title: 'Manage Advances', desc: 'Edit / delete / fix wrong-name advances & payments', icon: '💵', color: 'from-rose-600 to-rose-700', roles: ['owner'], Component: Advances },
     { key: 'dashboard', title: 'Dashboard',      desc: 'Daily totals, by welder & party',      icon: '📊', color: 'from-blue-600 to-blue-700',   roles: ['incharge', 'owner'], Component: Dashboard },
     { key: 'export',    title: 'Export / Share', desc: 'Daily PDF report for WhatsApp',         icon: '📄', color: 'from-violet-600 to-violet-700', roles: ['owner'], Component: Export },
     { key: 'stock',     title: 'Raw Material Stock', desc: 'Balance + add incoming stock',      icon: '📦', color: 'from-cyan-600 to-cyan-700',   roles: ['incharge', 'owner'], Component: RawMaterialStock },
