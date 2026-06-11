@@ -10,7 +10,7 @@ import { useMemo, useState } from 'react'
 import { Button, Card, FieldLabel, NumberInput, Select, TextInput, DateInput, useToast, Toast } from '../../../core/ui'
 import { todayStr, fmtNum, fmtDate } from '../../../core/utils/format'
 import { useWelder } from '../WelderContext'
-import { PAYMENT_MODES } from '../config'
+import { PAYMENT_MODES, ADMIN_PASSWORD } from '../config'
 
 const money = (n) => '₹' + fmtNum(Math.round(Number(n) || 0))
 
@@ -45,6 +45,9 @@ export default function Advances({ owner = false, by = 'owner' }) {
 
   const del = (r) => {
     if (!confirm(`Delete this ${r.source === 'payment' ? 'payment' : 'advance'} of ${money(r.amount)} for ${r.contractor}? This cannot be undone.`)) return
+    const pass = prompt('Enter admin password to permanently delete:')
+    if (pass === null) return
+    if (pass !== ADMIN_PASSWORD) return show('Wrong admin password — not deleted', 2500)
     coll(r.source).remove(r.id)
     log('ADV_DELETE', `${r.slip || r.source} ${money(r.amount)} · ${r.contractor} deleted (${role})`, by)
     show('Deleted ✓')
