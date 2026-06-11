@@ -31,6 +31,21 @@ export const fmtDate = (iso) => {
 /** Indian-format rupee/number, rounded to whole. */
 export const fmtNum = (n) => Math.round(Number(n) || 0).toLocaleString('en-IN')
 
+/**
+ * Canonicalise a name (product / contractor / party) so the SAME entity matches
+ * as one string here AND in the Plating app. MUST stay identical to the Plating
+ * app's normalizeProductName: folds curly inch/foot marks (17” → 17") and curly
+ * apostrophes to straight, and collapses whitespace. Case is preserved. Without
+ * this the welder could emit "X Frame 17”" while plating uses "X Frame 17"",
+ * splitting one product into two and breaking cross-app balances.
+ */
+export const canonicalName = (s) =>
+  String(s ?? '')
+    .replace(/[“”″]/g, '"')
+    .replace(/[‘’′]/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+
 /** Decimal-friendly number (for weights like 0.5 kg) — up to 3 dp, no trailing zeros. */
 export const fmtDec = (n) =>
   (Number(n) || 0).toLocaleString('en-IN', { maximumFractionDigits: 3 })

@@ -1,16 +1,18 @@
 /**
  * Advances — OWNER ONLY. Manage money paid to welders (Payments + Advances):
  *   • Modify amount / date / mode / remark
- *   • Delete an entry made by mistake
+ *   • Delete an entry made by mistake (admin-password gated)
  *   • Reassign (interchange) the contractor if the name was entered wrong
- * The Ledger page records new advances/payments; this page fixes them. Every
- * action is written to the audit log.
+ *   • Per-contractor summary: paid (period) + outstanding (all-time) + 1-tap Settle
+ * The Ledger page records new advances/payments; this page fixes & settles them.
+ * Every action is written to the audit log.
  */
 import { useMemo, useState } from 'react'
 import { Button, Card, FieldLabel, NumberInput, Select, TextInput, DateInput, useToast, Toast } from '../../../core/ui'
 import { todayStr, fmtNum, fmtDate } from '../../../core/utils/format'
 import { useWelder } from '../WelderContext'
 import { PAYMENT_MODES, ADMIN_PASSWORD } from '../config'
+import { buildLedger, nextPaymentSlip, newPayment } from '../logic/pay'
 
 const money = (n) => '₹' + fmtNum(Math.round(Number(n) || 0))
 
@@ -19,19 +21,31 @@ const fromPayment = (p) => ({ source: 'payment', id: p.id, contractor: p.contrac
 const fromLedger = (l) => ({ source: 'ledger', id: l.id, contractor: l.contractor || '', amount: Number(l.amount) || 0, date: l.date || '', mode: '', remark: l.note || '', slip: '', reversed: !!l.reversed })
 
 export default function Advances({ owner = false, by = 'owner' }) {
-  const { payments, ledger, welders, log } = useWelder()
+  const { dispatches, rates, payments, ledger, welders, log } = useWelder()
   const { msg, show } = useToast()
-  const [filter, setFilter] = useState('')   // contractor name or '' = all
-  const [edit, setEdit] = useState(null)     // row being edited
+  const [filter, setFilter] = useState('')          // contractor name or '' = all
+  const [periodMode, setPeriodMode] = useState('all')   // 'all' | 'month'
+  const [month, setMonth] = useState(todayStr().slice(0, 7))
+  const [edit, setEdit] = useState(null)            // row being edited
   const role = owner ? 'Owner' : 'Manager'
 
   const rows = useMemo(() => {
+    const inPeriod = (date) => periodMode === 'all' || (date || '').slice(0, 7) === month
     const pays = payments.list.map(fromPayment)
     const advs = ledger.list.filter(l => l.type === 'advance').map(fromLedger)
     return [...pays, ...advs]
       .filter(r => !filter || r.contractor === filter)
+      .filter(r => inPeriod(r.date))
       .sort((x, y) => (y.date || '').localeCompare(x.date || ''))
-  }, [payments.list, ledger.list, filter])
+  }, [payments.list, ledger.list, filter, periodMode, month])
+
+  // Per-contractor summary (only when one contractor is selected).
+  const summary = useMemo(() => {
+    if (!filter) return null
+    const paidPeriod = rows.filter(r => !r.reversed).reduce((s, r) => s + r.amount, 0)
+    const led = buildLedger(dispatches.list, rates.list, payments.list, ledger.list, filter, '', todayStr())
+    return { paidPeriod, outstanding: led.closing }
+  }, [filter, rows, dispatches.list, rates.list, payments.list, ledger.list])
 
   const coll = (src) => (src === 'payment' ? payments : ledger)
 
@@ -61,16 +75,53 @@ export default function Advances({ owner = false, by = 'owner' }) {
     show('Updated ✓'); setEdit(null)
   }
 
+  const settle = () => {
+    if (!filter || !summary || summary.outstanding <= 0) return
+    const amt = Math.round(summary.outstanding)
+    if (!confirm(`Record a settlement payment of ${money(amt)} to ${filter}? This clears the outstanding balance.`)) return
+    const slip = nextPaymentSlip(payments.list)
+    payments.insert(newPayment({ slip, contractor: filter, amount: amt, date: todayStr(), mode: 'Cash', remark: 'Settlement', paidByUser: '', paidByRole: role }))
+    log('PAYMENT', `${slip} · ${filter} ${money(amt)} settlement (${role})`, by, slip)
+    show(`Settled ${money(amt)} → ${slip} ✓`)
+  }
+
   return (
     <div className="max-w-2xl mx-auto p-4 space-y-4">
       <Toast msg={msg} />
 
-      <Card className="p-4">
-        <FieldLabel>Contractor</FieldLabel>
-        <Select className="mt-1" value={filter} onChange={e => setFilter(e.target.value)}
-          options={[{ value: '', label: 'All contractors' }, ...welders.list.map(w => ({ value: w.name, label: w.name }))]} />
-        <p className="text-[11px] text-slate-400 mt-2">Fix money paid to welders — edit the amount/date, delete a wrong entry, or move it to the correct contractor (change the Contractor dropdown in the row).</p>
+      <Card className="p-4 space-y-3">
+        <div><FieldLabel>Contractor</FieldLabel>
+          <Select className="mt-1" value={filter} onChange={e => setFilter(e.target.value)}
+            options={[{ value: '', label: 'All contractors' }, ...welders.list.map(w => ({ value: w.name, label: w.name }))]} /></div>
+        <div className="flex gap-2">
+          {[['all', 'All time'], ['month', 'Month']].map(([k, l]) => (
+            <button key={k} onClick={() => setPeriodMode(k)} className={`flex-1 py-2 rounded-xl font-bold text-sm ${periodMode === k ? 'bg-emerald-600 text-white shadow' : 'bg-slate-100 text-slate-500'}`}>{l}</button>
+          ))}
+        </div>
+        {periodMode === 'month' && (
+          <input type="month" value={month} onChange={e => setMonth(e.target.value)} className="w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold" />
+        )}
+        <p className="text-[11px] text-slate-400">Fix money paid to welders — edit amount/date, delete a wrong entry (admin password), or move it to the correct contractor (change the Contractor dropdown in the row).</p>
       </Card>
+
+      {/* Per-contractor summary + Settle */}
+      {summary && (
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="font-bold text-slate-800">{filter}</div>
+            <span className={`text-xs font-bold px-2 py-0.5 rounded ${summary.outstanding > 0 ? 'bg-red-100 text-red-700' : summary.outstanding < 0 ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
+              {summary.outstanding > 0 ? `${money(summary.outstanding)} outstanding` : summary.outstanding < 0 ? `${money(-summary.outstanding)} advance/credit` : 'Settled'}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-center">
+            <div className="bg-slate-50 rounded-xl py-2"><div className="font-bold text-emerald-600">{money(summary.paidPeriod)}</div><div className="text-[10px] text-slate-400">Paid ({periodMode === 'all' ? 'all time' : month})</div></div>
+            <div className="bg-slate-50 rounded-xl py-2"><div className={`font-bold ${summary.outstanding > 0 ? 'text-red-600' : 'text-slate-700'}`}>{money(Math.abs(summary.outstanding))}</div><div className="text-[10px] text-slate-400">{summary.outstanding < 0 ? 'Advance/credit' : 'Outstanding (all-time)'}</div></div>
+          </div>
+          {summary.outstanding > 0 && (
+            <Button size="sm" variant="success" className="w-full mt-3" onClick={settle}>💸 Settle {money(summary.outstanding)} (record payment)</Button>
+          )}
+        </Card>
+      )}
 
       <Card className="p-3 overflow-x-auto">
         <table className="w-full text-xs">
@@ -99,7 +150,7 @@ export default function Advances({ owner = false, by = 'owner' }) {
             ))}
           </tbody>
         </table>
-        {rows.length === 0 && <p className="text-center text-sm text-slate-400 py-4">No advances or payments.</p>}
+        {rows.length === 0 && <p className="text-center text-sm text-slate-400 py-4">No advances or payments{periodMode === 'month' ? ' in ' + month : ''}.</p>}
         <p className="text-[11px] text-slate-400 mt-2">Changing the Contractor dropdown moves the entry to that welder. Reversed entries show struck-through. All changes are logged.</p>
       </Card>
 

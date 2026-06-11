@@ -6,6 +6,7 @@
 import { useRef, useState } from 'react'
 import { Button, Card, FieldLabel, TextInput, Select, useToast, Toast } from '../../../core/ui'
 import { useWelder } from '../WelderContext'
+import { canonicalName } from '../../../core/utils/format'
 import { OWNER_EMAILS, FINISHES, finishedName, isPlatingFinish, PLATING_SYNC_FROM, SOURCE_APP } from '../config'
 import { pushPlatingIncoming, listPlatingIncomingIds } from '../../../core/db/firebase'
 
@@ -63,7 +64,7 @@ function ManageList({ title, repo, hint, log, logKey, onRename }) {
   const [editId, setEditId] = useState(null)
   const [editName, setEditName] = useState('')
   const add = () => {
-    const nm = name.trim()
+    const nm = canonicalName(name)
     if (!nm) return show('Enter a name', 2000)
     if (repo.list.some(x => x.name.toLowerCase() === nm.toLowerCase())) return show('Already exists', 2000)
     repo.insert({ name: nm, order: repo.list.length })
@@ -71,7 +72,7 @@ function ManageList({ title, repo, hint, log, logKey, onRename }) {
   }
   const startEdit = (x) => { setEditId(x.id); setEditName(x.name) }
   const saveEdit = (x) => {
-    const nm = editName.trim()
+    const nm = canonicalName(editName)
     if (!nm) return show('Enter a name', 2000)
     if (nm !== x.name) {
       if (repo.list.some(y => y.name.toLowerCase() === nm.toLowerCase() && y.id !== x.id)) return show('Already exists', 2000)
@@ -127,6 +128,8 @@ function DataTools() {
   const { dispatches, products, welders, parties, platingOutbox, rates, payments, ledger, users, components, receipts, adjustments, logs, log } = useWelder()
   const { msg, show } = useToast()
   const fileRef = useRef(null)
+  const [lastBackup, setLastBackup] = useState(() => localStorage.getItem('wld:lastBackup'))
+  const [nowTs] = useState(() => Date.now())
 
   // Back up EVERYTHING (every collection in the app).
   const backup = () => {
@@ -138,6 +141,7 @@ function DataTools() {
     }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `welder-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click()
+    const ts = new Date().toISOString(); localStorage.setItem('wld:lastBackup', ts); setLastBackup(ts)
     show('Full backup downloaded ✓')
   }
   const restore = async (e) => {
@@ -159,6 +163,17 @@ function DataTools() {
       <Toast msg={msg} />
       <FieldLabel>Backup &amp; Reset</FieldLabel>
       <p className="text-[11px] text-slate-400 -mt-1">Backup includes EVERYTHING — entries, rates, payments, ledger, materials, stock, users, etc.</p>
+      {(() => {
+        const days = lastBackup ? Math.floor((nowTs - new Date(lastBackup).getTime()) / 86400000) : null
+        const stale = days === null || days >= 7
+        return (
+          <div className={`rounded-xl px-3 py-2 text-xs font-semibold ${stale ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
+            {lastBackup
+              ? `Last backup: ${days === 0 ? 'today' : days + ' day' + (days === 1 ? '' : 's') + ' ago'}${stale ? ' — please back up now' : ' ✓'}`
+              : '⚠ No backup yet on this device — please download one now'}
+          </div>
+        )
+      })()}
       <div className="grid grid-cols-2 gap-2">
         <Button variant="primary" onClick={backup}>⬇ Backup all data</Button>
         <Button variant="neutral" onClick={() => fileRef.current?.click()}>⬆ Restore</Button>
@@ -274,7 +289,7 @@ function ManageProducts() {
   const ownerOpts = [{ value: '', label: 'Common (all welders)' }, ...welders.list.map(w => ({ value: w.name, label: `${w.name} only` }))]
 
   const add = () => {
-    const nm = name.trim()
+    const nm = canonicalName(name)
     if (!nm) return show('Enter a name', 2000)
     if (products.list.some(x => x.name.toLowerCase() === nm.toLowerCase() && (x.welder || '') === owner)) return show('Already exists', 2000)
     products.insert({ name: nm, welder: owner, noPlating: !plating, order: products.list.length })
