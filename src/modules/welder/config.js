@@ -119,8 +119,18 @@ export const PLATING_FINISHES = ['chrome', 'gold', 'rosegold']
 export const isPlatingFinish = (key) => PLATING_FINISHES.includes(key)
 
 /** Welder→Plating sync: only challans dated on/after this go to the Plating
- *  app's Incoming queue (older data already exists there via Excel import). */
+ *  app's Incoming queue (older data already exists there via Excel import).
+ *  NOTE: this doubles as the May-2026 firewall — entries dated before this
+ *  (e.g. the manager's May backfill below) never reach the Plating app. */
 export const PLATING_SYNC_FROM = '2026-06-01'
+
+/** Manager (in-charge) date window: normally the last 7 days, PLUS a one-off
+ *  May-2026 backfill window [FROM..TO] so they can enter May entries. Dates
+ *  between the two (e.g. early June older than 7 days) stay locked. Owner is
+ *  unbounded. Because this whole window sits before PLATING_SYNC_FROM, May
+ *  entries never push to the Plating app — they stay local to the welder app. */
+export const MANAGER_BACKDATE_FROM = '2026-05-01'
+export const MANAGER_BACKDATE_TO = '2026-05-31'
 
 /** Welder challan prefix from the welder's name, e.g. "Naveen" → "NAV". */
 export const welderPrefix = (name) => ((name || '').replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase() || 'WLD')

@@ -65,6 +65,60 @@ export function buildReportPdf(dispatches, { from, to, groupBy = 'product', weld
   return doc
 }
 
+/**
+ * Date-wise PIVOT report — one COLUMN per product, one ROW per date, cells =
+ * pieces dispatched. TOTAL row sums each product across all dates (+ grand
+ * total); a Total column sums each date. Same format as the Plating app's
+ * date-wise report. Filters: date range + welder/finish/party/product.
+ */
+export function buildDateWisePivotPdf(dispatches, { from, to, welder, finish, party, product }) {
+  const rows = dispatches.filter(d => Number(d.qty) > 0
+    && (!from || (d.date || '') >= from) && (!to || (d.date || '') <= to)
+    && (!welder || d.welder === welder)
+    && (!finish || d.finish === finish)
+    && (!party || d.party === party)
+    && (!product || d.productName === product))
+
+  const dates = [...new Set(rows.map(d => d.date))].sort()
+  const cols = [...new Set(rows.map(d => d.productName || '—'))].sort()
+  const cell = {}
+  for (const d of rows) {
+    const p = d.productName || '—'
+    ;(cell[d.date] = cell[d.date] || {})[p] = (cell[d.date]?.[p] || 0) + Number(d.qty)
+  }
+  const colTotal = (p) => rows.reduce((s, d) => s + ((d.productName || '—') === p ? Number(d.qty) : 0), 0)
+  const grand = rows.reduce((s, d) => s + Number(d.qty), 0)
+
+  const filters = [
+    welder && `Contractor: ${welder}`, finish && `Finish: ${finishLabelOf(finish)}`,
+    party && `Sent to: ${party}`, product && `Product: ${product}`,
+  ].filter(Boolean).join('  ·  ')
+
+  const doc = new jsPDF(cols.length > 6 ? 'l' : 'p', 'pt', 'a4')
+  doc.setFontSize(16); doc.setTextColor(...AMBER); doc.setFont(undefined, 'bold')
+  doc.text(APP_TITLE, 40, 40)
+  doc.setFontSize(13); doc.setTextColor(30, 41, 59)
+  doc.text('Date-wise Report — Sent (OUT)', 40, 60)
+  doc.setFontSize(10); doc.setTextColor(100, 116, 139); doc.setFont(undefined, 'normal')
+  const period = from || to ? `${from ? fmtDate(from) : '…'} to ${to ? fmtDate(to) : '…'}` : 'All dates'
+  doc.text(`${period}  ·  Total ${fmtNum(grand)} pcs`, 40, 76)
+  if (filters) doc.text(filters, 40, 90)
+
+  autoTable(doc, {
+    startY: filters ? 102 : 92,
+    head: [['Date', ...cols, 'Total']],
+    body: dates.map(d => {
+      const vals = cols.map(p => cell[d]?.[p] || 0)
+      return [fmtDate(d), ...vals.map(v => v || ''), vals.reduce((s, v) => s + v, 0)]
+    }),
+    foot: [['TOTAL', ...cols.map(p => colTotal(p)), grand]],
+    headStyles: { fillColor: AMBER }, footStyles: { fillColor: [71, 85, 105], textColor: 255, fontStyle: 'bold' },
+    styles: { fontSize: cols.length > 8 ? 7 : 9, halign: 'center' }, columnStyles: { 0: { halign: 'left' } },
+    margin: { left: 40, right: 40 },
+  })
+  return doc
+}
+
 export function buildDailyPdf(dispatches, date) {
   const doc = new jsPDF('p', 'pt', 'a4')
   doc.setFontSize(16); doc.setTextColor(...AMBER); doc.setFont(undefined, 'bold')

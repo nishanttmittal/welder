@@ -8,7 +8,7 @@ import { Button, Card, FieldLabel, Select, useToast, Toast } from '../../../core
 import { todayStr } from '../../../core/utils/format'
 import { useWelder } from '../WelderContext'
 import { FINISHES } from '../config'
-import { buildReportPdf, buildDailyPdf, sharePdf } from '../logic/pdf'
+import { buildReportPdf, buildDailyPdf, buildDateWisePivotPdf, sharePdf } from '../logic/pdf'
 
 const GROUP_OPTS = [
   ['product', 'By Product'],
@@ -37,6 +37,11 @@ export default function Export() {
   const shareDaily = async () => {
     const doc = buildDailyPdf(dispatches.list, to)
     const r = await sharePdf(doc, `Welder_Dispatch_${to}.pdf`)
+    show(r === 'shared' ? 'Shared ✓' : r === 'cancelled' ? 'Cancelled' : 'Downloaded ✓')
+  }
+  const shareDatewise = async () => {
+    const doc = buildDateWisePivotPdf(dispatches.list, { from, to, welder, finish, party, product })
+    const r = await sharePdf(doc, `Welder_DateWise_${from}_${to}.pdf`)
     show(r === 'shared' ? 'Shared ✓' : r === 'cancelled' ? 'Cancelled' : 'Downloaded ✓')
   }
 
@@ -73,6 +78,7 @@ export default function Export() {
         </div>
 
         <Button variant="primary" size="lg" className="w-full !bg-amber-600" onClick={share}>📄 Share Report (WhatsApp)</Button>
+        <Button variant="neutral" className="w-full" onClick={shareDatewise}>📅 Date-wise (Product × Date)</Button>
       </Card>
 
       <Card className="p-5 space-y-2">
