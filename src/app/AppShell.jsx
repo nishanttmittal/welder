@@ -15,6 +15,8 @@ import RoleChooser from './RoleChooser'
 import AuthGate from './AuthGate'
 
 const ROLE_KEY = 'wld:role'
+const STAFF_KEY = 'wld:staff' // remembers this device is a welder ENTRY phone
+const WHO_KEY = 'wld:who'     // remembers which welder, for attribution
 
 /** Bottom-fixed bar — reachable on phones, away from the top status area. */
 function BottomBar({ label, onSwitch, switchLabel = 'Switch' }) {
@@ -87,10 +89,32 @@ export default function AppShell({ moduleId }) {
   const reset = () => { localStorage.removeItem(ROLE_KEY); setRole(null) }
 
   const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
-  const staffLock = params && (params.has('welder') || params.has('floor'))
-  const who = (params && params.get('who')) || ''
   const roleParam = params && params.get('role') // 'user1' | 'owner' (dedicated links)
   const normParam = roleParam === 'user1' ? 'incharge' : roleParam
+  const wantsExit = !!(params && (roleParam || params.has('exit'))) // owner/manager link → leave welder mode
+
+  // Remember welder ENTRY mode on this device. The home-screen PWA icon opens the
+  // manifest start_url (/welder/) WITHOUT ?welder=1, which would otherwise drop the
+  // worker into the Manager/Owner login. Persisting it once (from their ?welder=1
+  // link) keeps the icon landing on the entry screen. An owner/manager link
+  // (?role=… or ?exit=1) clears it so the phone can escape welder mode.
+  if (params && typeof localStorage !== 'undefined') {
+    if (params.has('welder') || params.has('floor')) {
+      localStorage.setItem(STAFF_KEY, '1')
+      const w = params.get('who') || ''
+      if (w) localStorage.setItem(WHO_KEY, w)
+    } else if (wantsExit) {
+      localStorage.removeItem(STAFF_KEY)
+      localStorage.removeItem(WHO_KEY)
+    }
+  }
+
+  const staffLock = !wantsExit && (
+    (params && (params.has('welder') || params.has('floor'))) ||
+    (typeof localStorage !== 'undefined' && localStorage.getItem(STAFF_KEY) === '1')
+  )
+  const who = (params && params.get('who')) ||
+    (typeof localStorage !== 'undefined' ? localStorage.getItem(WHO_KEY) : '') || ''
 
   if (staffLock) return <Provider><StaffView module={module} operator={who} /></Provider>
 
