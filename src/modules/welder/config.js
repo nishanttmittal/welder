@@ -155,6 +155,7 @@ export const KEYS = {
   rates:        'rates',
   payments:     'payments',
   ledger:       'ledger',
+  settlements:  'settlements',
   users:        'users',
   components:   'components',
   receipts:     'receipts',

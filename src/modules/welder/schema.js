@@ -194,6 +194,27 @@ export const ledgerSchema = [
 ]
 
 /**
+ * A finalized month HISAB for one welder. Snapshot of the numbers at finalize
+ * time + a LOCK: entries dated on/before cutoffDate for this welder need the
+ * admin password to edit, until the settlement is reopened.
+ */
+export const settlementSchema = [
+  field({ name: 'welder',     label: 'Welder',     type: 'text',   default: '', required: true }),
+  field({ name: 'month',      label: 'Month',      type: 'text',   default: '' }),   // YYYY-MM
+  field({ name: 'periodFrom', label: 'From',       type: 'text',   default: '' }),
+  field({ name: 'periodTo',   label: 'To',         type: 'text',   default: '' }),
+  field({ name: 'cutoffDate', label: 'Cutoff',     type: 'text',   default: '' }),   // lock entries on/before this
+  field({ name: 'opening',    label: 'Opening',    type: 'number', default: 0 }),
+  field({ name: 'earned',     label: 'Earned',     type: 'number', default: 0 }),
+  field({ name: 'advances',   label: 'Advances',   type: 'number', default: 0 }),
+  field({ name: 'payments',   label: 'Payments',   type: 'number', default: 0 }),
+  field({ name: 'dayPayment', label: 'Paid today', type: 'number', default: 0 }),
+  field({ name: 'net',        label: 'Net',        type: 'number', default: 0 }),
+  field({ name: 'finalizedBy', label: 'By',        type: 'text',   default: '' }),
+  field({ name: 'locked',     label: 'Locked',     type: 'toggle', default: true }),
+]
+
+/**
  * App user for role-based access (Google sign-in). Doc id = lowercased email so
  * Firestore rules can look the role up directly. Owner manages these in Admin.
  */

@@ -54,6 +54,7 @@ service cloud.firestore {
     // Money: owner-only writes; payments are Manager-create / Owner edit-reverse.
     match /apps/welder/rates/{id}    { allow read: if signedIn(); allow write: if isOwner(); }
     match /apps/welder/ledger/{id}   { allow read: if signedIn(); allow write: if isOwner(); }
+    match /apps/welder/settlements/{id} { allow read: if signedIn(); allow write: if isOwner(); }
     match /apps/welder/payments/{id} {
       allow read:           if signedIn();
       allow create:         if isManager();

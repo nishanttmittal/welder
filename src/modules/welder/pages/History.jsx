@@ -12,7 +12,8 @@ import { useMemo, useState } from 'react'
 import { Button, Card, FieldLabel, SearchBar, Select, NumberInput, DateInput, TextInput, useToast, Toast } from '../../../core/ui'
 import { fmtDate, fmtNum } from '../../../core/utils/format'
 import { useWelder } from '../WelderContext'
-import { FINISHES, finishedName, EDIT_WINDOW_HOURS } from '../config'
+import { lockedOn } from '../logic/pay'
+import { FINISHES, finishedName, EDIT_WINDOW_HOURS, ADMIN_PASSWORD } from '../config'
 
 const within48 = (d, now) => {
   if (!d.createdAt) return true
@@ -20,7 +21,7 @@ const within48 = (d, now) => {
 }
 
 export default function History({ owner = false, by = 'admin' }) {
-  const { dispatches, products, welders, parties, logs, log } = useWelder()
+  const { dispatches, products, welders, parties, settlements, logs, log } = useWelder()
   const { msg, show } = useToast()
   const [q, setQ] = useState('')
   const [editing, setEditing] = useState(null)
@@ -37,13 +38,25 @@ export default function History({ owner = false, by = 'admin' }) {
       .sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || '').localeCompare(a.createdAt || ''))
   }, [dispatches.list, q])
 
+  // If this entry sits in a finalized (locked) hisab, require the admin password.
+  const lockGuard = (d) => {
+    const s = lockedOn(settlements?.list, d.welder, d.date)
+    if (!s) return true
+    const pwd = prompt(`${d.welder}'s ${s.month} hisab is FINALIZED & locked (entries up to ${s.cutoffDate}).\nEnter admin password to change this entry:`)
+    if (pwd === null) return false
+    if (pwd !== ADMIN_PASSWORD) { show('Wrong password — entry stays locked', 2500); return false }
+    return true
+  }
+
   const saveEdit = (patch, changes, reason) => {
+    if (!lockGuard(editing)) return
     dispatches.update(editing.id, patch)
     const detail = changes.map(c => `${c.field}: ${c.old}→${c.new}`).join(', ') + ` · reason: ${reason}`
     log('EDIT', detail, by, editing.id)
     show('Corrected ✓'); setEditing(null)
   }
   const voidEntry = (d) => {
+    if (!lockGuard(d)) return
     const reason = prompt(`Void "${d.finishedName || d.productName} × ${d.qty}" (set to 0, kept in history)?\nReason:`)
     if (reason === null) return
     if (!reason.trim()) return show('Reason required', 2500)
@@ -52,6 +65,7 @@ export default function History({ owner = false, by = 'admin' }) {
     show('Voided ✓')
   }
   const hardDelete = (d) => {
+    if (!lockGuard(d)) return
     const reason = prompt(`PERMANENTLY DELETE "${d.finishedName || d.productName} × ${d.qty}"?\nThis cannot be undone. Reason (required):`)
     if (reason === null) return
     if (!reason.trim()) return show('Reason required — not deleted', 2500)

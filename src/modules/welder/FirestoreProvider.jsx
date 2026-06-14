@@ -8,7 +8,7 @@ import { onSnapshot, setDoc, deleteDoc, getDocs, writeBatch } from 'firebase/fir
 import { db, paths, ensureSignedIn } from '../../core/db/firebase'
 import { makeNormalizer } from '../../core/schema/field'
 import { makeId } from '../../core/db/repository'
-import { dispatchSchema, productSchema, welderSchema, partySchema, platingOutboxSchema, rateSchema, paymentSchema, ledgerSchema, userSchema, componentSchema, receiptSchema, adjustmentSchema } from './schema'
+import { dispatchSchema, productSchema, welderSchema, partySchema, platingOutboxSchema, rateSchema, paymentSchema, ledgerSchema, settlementSchema, userSchema, componentSchema, receiptSchema, adjustmentSchema } from './schema'
 import { DEFAULT_PRODUCTS, DEFAULT_WELDERS, DEFAULT_PARTIES } from './config'
 import { lastUsedStore, countersStore } from './data'
 import { WelderCtx } from './WelderContext'
@@ -41,6 +41,7 @@ const normOutbox   = makeNormalizer(platingOutboxSchema)
 const normRate     = makeNormalizer(rateSchema)
 const normPayment  = makeNormalizer(paymentSchema)
 const normLedger   = makeNormalizer(ledgerSchema)
+const normSettlement = makeNormalizer(settlementSchema)
 const normUser     = makeNormalizer(userSchema)
 const normComponent = makeNormalizer(componentSchema)
 const normReceipt   = makeNormalizer(receiptSchema)
@@ -59,6 +60,7 @@ export function FirestoreProvider({ children }) {
   const rates      = useCloudCollection(paths.rates, paths.rate, normRate)
   const payments   = useCloudCollection(paths.payments, paths.payment, normPayment)
   const ledger     = useCloudCollection(paths.ledger, paths.ledgerDoc, normLedger)
+  const settlements = useCloudCollection(paths.settlements, paths.settlementDoc, normSettlement)
   const users      = useCloudCollection(paths.users, paths.user, normUser)
   const components = useCloudCollection(paths.components, paths.component, normComponent)
   const receipts   = useCloudCollection(paths.receipts, paths.receipt, normReceipt)
@@ -109,7 +111,7 @@ export function FirestoreProvider({ children }) {
   }
 
   const value = {
-    dispatches, products, welders, parties, platingOutbox, rates, payments, ledger, users, components, receipts, adjustments, logs,
+    dispatches, products, welders, parties, platingOutbox, rates, payments, ledger, settlements, users, components, receipts, adjustments, logs,
     lastUsed: lastUsedStore, counters: countersStore, log,
     cloud: { connected: !error, error },
   }

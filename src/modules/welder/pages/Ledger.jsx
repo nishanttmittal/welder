@@ -13,7 +13,8 @@ import autoTable from 'jspdf-autotable'
 import { Button, Card, FieldLabel, NumberInput, Select, TextInput, DateInput, useToast, Toast } from '../../../core/ui'
 import { todayStr, fmtNum, fmtDate } from '../../../core/utils/format'
 import { useWelder } from '../WelderContext'
-import { buildLedger, nextPaymentSlip, newPayment, paidByLabel } from '../logic/pay'
+import { buildLedger, nextPaymentSlip, newPayment, paidByLabel, lockedOn } from '../logic/pay'
+import { ADMIN_PASSWORD } from '../config'
 import { PAYMENT_MODES, MANAGER_HISTORY_MONTHS } from '../config'
 
 /** First selectable date for a Manager (owner unlimited). */
@@ -35,7 +36,7 @@ const ENTRY_TYPES = [
 ]
 
 export default function Ledger({ owner = false, by = 'owner' }) {
-  const { dispatches, rates, payments, ledger, welders, products, log } = useWelder()
+  const { dispatches, rates, payments, ledger, welders, products, settlements, log } = useWelder()
   const { msg, show } = useToast()
   const myRole = owner ? 'Owner' : 'Manager'
 
@@ -60,10 +61,21 @@ export default function Ledger({ owner = false, by = 'owner' }) {
     () => buildLedger(dispatches.list, rates.list, payments.list, ledger.list, contractor, periodFrom, periodTo, refProducts),
     [dispatches.list, rates.list, payments.list, ledger.list, contractor, periodFrom, periodTo, refProducts])
 
+  // Block adding/changing entries inside a finalized (locked) hisab without the admin password.
+  const lockGuard = (date) => {
+    const s = lockedOn(settlements?.list, contractor, date)
+    if (!s) return true
+    const pwd = prompt(`${contractor}'s ${s.month} hisab is FINALIZED & locked (entries up to ${s.cutoffDate}).\nEnter admin password to change:`)
+    if (pwd === null) return false
+    if (pwd !== ADMIN_PASSWORD) { show('Wrong password — locked', 2500); return false }
+    return true
+  }
+
   const saveEntry = (type, { amount, date, mode: payMode, remark, name, direction }) => {
     const v = Number(amount) || 0
     if (v <= 0) return show('Enter an amount', 2000)
     if (!contractor) return show('Pick a contractor', 2000)
+    if (!lockGuard(date)) return
     if (type === 'payment') {
       const slip = nextPaymentSlip(payments.list)
       payments.insert(newPayment({ slip, contractor, amount: v, date, mode: payMode, remark, paidByUser: name, paidByRole: myRole }))
@@ -79,6 +91,7 @@ export default function Ledger({ owner = false, by = 'owner' }) {
 
   // Owner: reverse (never delete) — keeps history, drops it from the balance.
   const reverseLine = (line) => {
+    if (!lockGuard(line.date)) return
     const reason = prompt(`Reverse ${line.type} ${line.slipNo || ''} (${money(line.credit || line.debit)})?\nReason:`)
     if (reason === null) return
     if (line.source === 'payment') { payments.update(line.refId, { reversed: true }); log('PAYMENT_REVERSE', `${line.slipNo} ${money(line.credit)} reversed · ${reason}`, by, line.refId) }

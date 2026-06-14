@@ -16,7 +16,7 @@ import autoTable from 'jspdf-autotable'
 import { Button, Card, FieldLabel, NumberInput, Select, TextInput, DateInput, useToast, Toast } from '../../../core/ui'
 import { todayStr, fmtNum, fmtDate } from '../../../core/utils/format'
 import { useWelder } from '../WelderContext'
-import { FINISHES, PROCESSES, processLabel, PAYMENT_MODES, MANAGER_HISTORY_MONTHS } from '../config'
+import { FINISHES, PROCESSES, processLabel, PAYMENT_MODES, MANAGER_HISTORY_MONTHS, ADMIN_PASSWORD } from '../config'
 
 /** First selectable date for a Manager (owner has no limit): first day of the
  *  month MANAGER_HISTORY_MONTHS back. */
@@ -24,7 +24,7 @@ function managerFloorDate() {
   const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - MANAGER_HISTORY_MONTHS)
   return d.toISOString().slice(0, 10)
 }
-import { rateOn, currentOpenRate, dayBefore, rateTimeline, isRateActiveNow, statement, statementsCSV, today as todayCalc, nextPaymentSlip, newPayment, buildLedger } from '../logic/pay'
+import { rateOn, currentOpenRate, dayBefore, rateTimeline, isRateActiveNow, statement, statementsCSV, today as todayCalc, nextPaymentSlip, newPayment, buildLedger, lockedOn } from '../logic/pay'
 
 const money = (n) => '₹' + fmtNum(Math.round(Number(n) || 0))
 // Piece RATES may carry up to 2 decimals (e.g. ₹8.50, ₹13.25). Money TOTALS stay whole-rupee.
@@ -33,7 +33,7 @@ const rate$ = (n) => '₹' + round2(n).toLocaleString('en-IN', { maximumFraction
 const rProductName = (r) => r.productName || r.product || '' // tolerate legacy rate records
 
 export default function ContractorPay({ owner = false, by = 'owner' }) {
-  const { dispatches, products, welders, rates, payments, log } = useWelder()
+  const { dispatches, products, welders, rates, payments, ledger, settlements, log } = useWelder()
   const { msg, show } = useToast()
 
   // Period: month view (default) or a single day.
@@ -52,6 +52,7 @@ export default function ContractorPay({ owner = false, by = 'owner' }) {
   const [effFrom, setEffFrom] = useState(todayStr())       // new rate starts this date (today or future)
   const [editRate, setEditRate] = useState(null)   // rate record being edited (fix date/value)
   const [pay, setPay] = useState(null)             // {contractor}
+  const [finalizing, setFinalizing] = useState(null) // contractor name when finalizing hisab
 
   const mgrMinDate = owner ? undefined : managerFloorDate()
   const mgrMinMonth = owner ? undefined : managerFloorDate().slice(0, 7)
@@ -188,6 +189,49 @@ export default function ContractorPay({ owner = false, by = 'owner' }) {
     show('Hisab PDF generated ✓')
   }
 
+  // Cut-off for a settlement = today if settling the current month, else month-end.
+  const settleCutoff = mode === 'day' ? day : (month >= todayStr().slice(0, 7) ? todayStr() : `${month}-31`)
+
+  // Live preview of a welder's settlement (running balance up to the cut-off).
+  const settlePreview = (contractor) => {
+    const led = buildLedger(dispatches.list, rates.list, payments.list, ledger.list, contractor, '', settleCutoff, refProducts)
+    const earned = led.lines.filter(l => l.type === 'Production' || l.type === 'Material (dispatch)').reduce((s, l) => s + l.debit, 0)
+    const advances = led.lines.filter(l => l.type === 'Advance' || l.type === 'Opening Balance').reduce((s, l) => s + l.credit, 0)
+    const paid = led.lines.filter(l => l.type === 'Payment').reduce((s, l) => s + l.credit, 0)
+    return { cutoff: settleCutoff, earned, advances, paid, net: led.closing }
+  }
+
+  const doFinalize = (contractor, dayPay) => {
+    const already = settlements.list.find(s => s.welder === contractor && s.month === (mode === 'day' ? day.slice(0, 7) : month) && s.locked !== false)
+    if (already) return show('That month is already finalized for this welder', 2500)
+    const p = settlePreview(contractor)
+    const dp = Number(dayPay) || 0
+    if (dp > 0) {
+      const slip = nextPaymentSlip(payments.list)
+      payments.insert(newPayment({ slip, contractor, amount: dp, date: p.cutoff, mode: 'Cash', remark: 'Hisab settlement payment', paidByUser: '', paidByRole: myRole }))
+      log('PAYMENT', `${slip} · ${contractor} ${money(dp)} (settlement)`, by, slip)
+    }
+    const net = p.net + dp // dp reduces what we owe (credit)
+    settlements.insert({
+      welder: contractor, month: mode === 'day' ? day.slice(0, 7) : month, periodFrom: from, periodTo: p.cutoff,
+      cutoffDate: p.cutoff, opening: 0, earned: p.earned, advances: p.advances, payments: p.paid + dp,
+      dayPayment: dp, net, finalizedBy: by, locked: true,
+    })
+    log('SETTLEMENT_FINALIZE', `${contractor} ${periodLabel} · earned ${money(p.earned)} − adv/paid ${money(p.advances + p.paid + dp)} = ${money(net)} (locked ≤ ${p.cutoff})`, by)
+    show('Hisab finalized & locked ✓')
+    setFinalizing(null)
+    generateHisab(contractor)
+  }
+
+  const reopenSettlement = (s) => {
+    const pwd = prompt(`Reopen ${s.welder}'s ${s.month} hisab? This unlocks its entries for editing.\nEnter admin password:`)
+    if (pwd === null) return
+    if (pwd !== ADMIN_PASSWORD) return show('Wrong password — not reopened', 2500)
+    settlements.update(s.id, { locked: false })
+    log('SETTLEMENT_REOPEN', `${s.welder} ${s.month} reopened (cutoff ${s.cutoffDate})`, by)
+    show('Hisab reopened — entries editable again')
+  }
+
   const exportExcel = () => {
     const csv = statementsCSV(statements, periodLabel)
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
@@ -319,15 +363,24 @@ export default function ContractorPay({ owner = false, by = 'owner' }) {
         const refPcs = refProducts.size
           ? dispatches.list.filter(d => d.welder === st.contractor && Number(d.qty) > 0 && refProducts.has(d.productName) && d.date >= from && d.date <= to).reduce((s, d) => s + Number(d.qty), 0)
           : 0
+        const settled = settlements.list.find(s => s.welder === st.contractor && s.month === (mode === 'day' ? day.slice(0, 7) : month) && s.locked !== false)
         return (
           <Card key={st.contractor} className="p-5 space-y-3">
             <div className="flex items-center justify-between gap-2">
               <div className="font-bold text-lg text-slate-800">{st.contractor}</div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap justify-end">
                 <Button size="sm" variant="neutral" onClick={() => exportPDF(st)}>📄 Products</Button>
-                <Button size="sm" variant="success" onClick={() => generateHisab(st.contractor)}>🧾 Generate Hisab</Button>
+                <Button size="sm" variant="success" onClick={() => generateHisab(st.contractor)}>🧾 Hisab PDF</Button>
+                {owner && !settled && <Button size="sm" variant="primary" onClick={() => setFinalizing(st.contractor)}>🔒 Finalize</Button>}
               </div>
             </div>
+
+            {settled && (
+              <div className="flex items-center justify-between bg-slate-100 rounded-xl px-3 py-2 text-xs">
+                <span className="font-semibold text-slate-600">🔒 {settled.month} finalized · {settled.net >= 0 ? `${money(settled.net)} payable` : `${money(-settled.net)} advance`} carried · locked ≤ {fmtDate(settled.cutoffDate)}</span>
+                {owner && <button onClick={() => reopenSettlement(settled)} className="text-blue-600 font-bold ml-2">Reopen</button>}
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-2">
               <div className="bg-amber-50 rounded-xl p-3 text-center"><div className="text-lg font-bold text-amber-700">{fmtNum(st.totalPieces)}</div><div className="text-[11px] text-slate-500">{periodShort} pcs · {money(st.payable)}</div></div>
@@ -362,6 +415,39 @@ export default function ContractorPay({ owner = false, by = 'owner' }) {
       {statements.length === 0 && <Card className="p-8 text-center text-slate-400">No contractors.</Card>}
 
       {editRate && <EditRateForm rate={editRate} onSave={saveRateEdit} onCancel={() => setEditRate(null)} />}
+      {finalizing && <FinalizeForm contractor={finalizing} preview={settlePreview(finalizing)} periodLabel={periodLabel} onConfirm={(dp) => doFinalize(finalizing, dp)} onCancel={() => setFinalizing(null)} />}
+    </div>
+  )
+}
+
+function FinalizeForm({ contractor, preview, periodLabel, onConfirm, onCancel }) {
+  const [dayPay, setDayPay] = useState('')
+  const dp = Number(dayPay) || 0
+  const finalNet = preview.net + dp
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-4" onClick={onCancel}>
+      <div className="bg-white rounded-2xl p-4 w-full max-w-sm space-y-3" onClick={e => e.stopPropagation()}>
+        <div className="font-bold text-lg text-slate-800">🔒 Finalize Hisab — {contractor}</div>
+        <div className="text-xs text-slate-500">Month: {periodLabel} · counts everything up to {fmtDate(preview.cutoff)}. After finalizing, these entries lock (admin password to change).</div>
+        <div className="bg-slate-50 rounded-xl p-3 space-y-1 text-sm">
+          <Row label="Total earned (piece + material)" value={money(preview.earned)} />
+          <Row label="Advances" value={money(preview.advances)} tone="text-emerald-600" />
+          <Row label="Payments" value={money(preview.paid)} tone="text-emerald-600" />
+          <div className="border-t border-slate-200 my-1" />
+          <Row label="Net now" value={preview.net >= 0 ? `${money(preview.net)} payable` : `${money(-preview.net)} advance`} strong />
+        </div>
+        <div>
+          <FieldLabel>Paid to {contractor} today (optional)</FieldLabel>
+          <NumberInput inputMode="decimal" className="mt-1" placeholder="0" value={dayPay} onChange={e => setDayPay(e.target.value)} />
+        </div>
+        <div className="bg-amber-50 rounded-xl p-3 text-sm font-bold text-amber-800">
+          Carry forward: {finalNet >= 0 ? `${money(finalNet)} payable to ${contractor}` : `${money(-finalNet)} advance with ${contractor}`}
+        </div>
+        <div className="flex gap-2 pt-1">
+          <Button variant="neutral" className="flex-1" onClick={onCancel}>Cancel</Button>
+          <Button variant="primary" className="flex-1" onClick={() => onConfirm(dp)}>Finalize & Lock</Button>
+        </div>
+      </div>
     </div>
   )
 }

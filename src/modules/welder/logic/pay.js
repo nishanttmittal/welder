@@ -148,6 +148,16 @@ export function newPayment({ slip, contractor, amount, date, mode, remark, paidB
   }
 }
 
+/**
+ * Is this welder+date inside a FINALIZED (locked) settlement period? Returns the
+ * locking settlement, or null. Entries dated ON/BEFORE a settlement's cutoffDate
+ * are locked until it's reopened.
+ */
+export function lockedOn(settlements, welder, date) {
+  if (!settlements || !date) return null
+  return settlements.find(s => s.welder === welder && s.locked !== false && (s.cutoffDate || '') >= date) || null
+}
+
 /** "Sri Ram (Manager)" / "Manager" / "" from a payment or ledger record. */
 export const paidByLabel = (user, role) =>
   user && role ? `${user} (${role})` : (user || role || '')
