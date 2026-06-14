@@ -35,7 +35,7 @@ const ENTRY_TYPES = [
 ]
 
 export default function Ledger({ owner = false, by = 'owner' }) {
-  const { dispatches, rates, payments, ledger, welders, log } = useWelder()
+  const { dispatches, rates, payments, ledger, welders, products, log } = useWelder()
   const { msg, show } = useToast()
   const myRole = owner ? 'Owner' : 'Manager'
 
@@ -55,9 +55,10 @@ export default function Ledger({ owner = false, by = 'owner' }) {
   const periodTo   = mode === 'month' ? `${month}-31` : to
   const periodLabel = mode === 'month' ? month : `${fmtDate(from)} – ${fmtDate(to)}`
 
+  const refProducts = useMemo(() => new Set(products.list.filter(p => p.referenceOnly).map(p => p.name)), [products.list])
   const led = useMemo(
-    () => buildLedger(dispatches.list, rates.list, payments.list, ledger.list, contractor, periodFrom, periodTo),
-    [dispatches.list, rates.list, payments.list, ledger.list, contractor, periodFrom, periodTo])
+    () => buildLedger(dispatches.list, rates.list, payments.list, ledger.list, contractor, periodFrom, periodTo, refProducts),
+    [dispatches.list, rates.list, payments.list, ledger.list, contractor, periodFrom, periodTo, refProducts])
 
   const saveEntry = (type, { amount, date, mode: payMode, remark, name, direction }) => {
     const v = Number(amount) || 0

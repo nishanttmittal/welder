@@ -298,6 +298,7 @@ function ManageProducts() {
   }
   const setOwnerFor = (p, w) => { products.update(p.id, { welder: w }); log('PRODUCT_OWNER', `${p.name} → ${w || 'Common'}`, 'owner') }
   const togglePlating = (p) => { const np = !p.noPlating; products.update(p.id, { noPlating: np }); log('PRODUCT_PLATING', `${p.name} ${np ? 'no-plating' : 'for plating'}`, 'owner') }
+  const toggleReference = (p) => { const ref = !p.referenceOnly; products.update(p.id, { referenceOnly: ref }); log('PRODUCT_REFERENCE', `${p.name} ${ref ? 'material/reference (not paid)' : 'payable in hisab'}`, 'owner') }
   const startEdit = (p) => { setEditId(p.id); setEditName(p.name) }
   const saveEdit = (p) => {
     const newName = editName.trim()
@@ -355,6 +356,7 @@ function ManageProducts() {
                 <div className="flex items-center gap-2 mt-1.5">
                   <Select className="!py-1 !w-32 text-xs" value={p.welder || ''} onChange={e => setOwnerFor(p, e.target.value)} options={ownerOpts} />
                   <button onClick={() => togglePlating(p)} title="For plating?" className={`text-[11px] font-bold px-2 py-1 rounded-lg flex-shrink-0 ${p.noPlating ? 'bg-slate-200 text-slate-500' : 'bg-blue-100 text-blue-700'}`}>{p.noPlating ? 'No plating' : 'For plating'}</button>
+                  <button onClick={() => toggleReference(p)} title="Material / reference — not paid in hisab" className={`text-[11px] font-bold px-2 py-1 rounded-lg flex-shrink-0 ${p.referenceOnly ? 'bg-amber-200 text-amber-800' : 'bg-emerald-100 text-emerald-700'}`}>{p.referenceOnly ? '📦 Material' : '💰 Paid'}</button>
                 </div>
               </div>
             )}

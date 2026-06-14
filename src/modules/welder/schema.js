@@ -74,6 +74,9 @@ export const productSchema = [
   field({ name: 'name',      label: 'Product',         type: 'text',   default: '', required: true }),
   field({ name: 'welder',    label: 'Belongs to',      type: 'text',   default: '' }),     // '' = common
   field({ name: 'noPlating', label: 'Not for plating', type: 'toggle', default: false }),
+  // referenceOnly: material/component product paid via the material/dispatch flow,
+  // NOT by welder piece-rate. Kept for reference/comparison; excluded from hisab.
+  field({ name: 'referenceOnly', label: 'Material / reference (not paid)', type: 'toggle', default: false }),
   // recipe: [{ componentId, qty }] — raw materials per ONE finished piece.
   field({ name: 'recipe',    label: 'Recipe',          type: 'list',   default: () => [] }),
 ]

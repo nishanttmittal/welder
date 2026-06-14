@@ -94,7 +94,10 @@ export const countable = (dispatches, contractor, from, to, opts = {}) =>
   dispatches.filter(d =>
     d.welder === contractor && num(d.qty) > 0 && inRange(d, from, to)
     && (!opts.product || d.productName === opts.product)
-    && (!opts.finish || d.finish === opts.finish))
+    && (!opts.finish || d.finish === opts.finish)
+    // referenceOnly/material products are excluded from pay; includeOnly flips it
+    && (!opts.exclude || !opts.exclude.has(d.productName))
+    && (!opts.includeOnly || opts.includeOnly.has(d.productName)))
 
 /**
  * Product-wise breakdown for a contractor/range. The rate is resolved PER ROW
@@ -156,7 +159,7 @@ export function statement(dispatches, rates, payments, contractor, from, to, opt
   const payable = products.reduce((s, p) => s + p.amount, 0)
   const paid = paidFor(payments, contractor, from, to)
   // all-time (payments aren't tagged by product/finish, so outstanding is whole-account)
-  const allProducts = productWise(dispatches, rates, contractor, '', '')
+  const allProducts = productWise(dispatches, rates, contractor, '', '', { exclude: opts.exclude })
   const payableEver = allProducts.reduce((s, p) => s + p.amount, 0)
   const paidEver = paidFor(payments, contractor, '', '')
   return { contractor, products, totalPieces, payable, paid, balance: payable - paid, outstanding: payableEver - paidEver }
@@ -184,12 +187,13 @@ export function today(dispatches, rates, contractor, todayStr, opts = {}) {
  * rate change never reprices an old line. The period "opening balance" is the
  * carried-forward running balance of everything dated before `from`.
  */
-export function buildLedger(dispatches, rates, payments, ledger, contractor, from, to) {
+export function buildLedger(dispatches, rates, payments, ledger, contractor, from, to, excludeProducts = null) {
   const lines = []
 
   // Production → DEBIT (increases what we owe the contractor)
   for (const d of dispatches) {
     if (d.welder !== contractor || !(num(d.qty) > 0)) continue
+    if (excludeProducts && excludeProducts.has(d.productName)) continue // material/reference, not paid
     const rate = rateOn(rates, d.productName, contractor, d.date)
     lines.push({
       date: d.date, slipNo: d.welderChallan || '', type: 'Production',
@@ -213,7 +217,7 @@ export function buildLedger(dispatches, rates, payments, ledger, contractor, fro
     const rev = !!e.reversed
     const amt = num(e.amount)
     const isDebit = e.direction === 'debit'
-    const label = e.type === 'opening' ? 'Opening Balance' : e.type === 'advance' ? 'Advance' : 'Adjustment'
+    const label = e.type === 'opening' ? 'Opening Balance' : e.type === 'advance' ? 'Advance' : e.type === 'material' ? 'Material (dispatch)' : 'Adjustment'
     lines.push({
       date: e.date, slipNo: '', type: label,
       description: (rev ? 'REVERSED: ' : '') + (e.note || label), paidBy: e.createdBy || '',

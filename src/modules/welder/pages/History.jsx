@@ -9,7 +9,7 @@
  * Nothing is ever overwritten silently.
  */
 import { useMemo, useState } from 'react'
-import { Button, Card, FieldLabel, SearchBar, Select, NumberStepper, DateInput, TextInput, useToast, Toast } from '../../../core/ui'
+import { Button, Card, FieldLabel, SearchBar, Select, NumberInput, DateInput, TextInput, useToast, Toast } from '../../../core/ui'
 import { fmtDate, fmtNum } from '../../../core/utils/format'
 import { useWelder } from '../WelderContext'
 import { FINISHES, finishedName, EDIT_WINDOW_HOURS } from '../config'
@@ -160,7 +160,7 @@ function EditModal({ entry, products, welders, parties, onCancel, onSave }) {
           <div><FieldLabel>Product</FieldLabel><Select className="mt-1" value={product} onChange={e => setProduct(e.target.value)} options={prodOpts} /></div>
           <div><FieldLabel>Finish</FieldLabel><Select className="mt-1" value={finish} onChange={e => setFinish(e.target.value)} options={FINISHES.map(f => ({ value: f.key, label: f.label }))} /></div>
           <div><FieldLabel>Sent to</FieldLabel><Select className="mt-1" value={party} onChange={e => setParty(e.target.value)} options={partyOpts} /></div>
-          <div><FieldLabel>Quantity</FieldLabel><div className="mt-1"><NumberStepper value={qty} onChange={setQty} /></div></div>
+          <div><FieldLabel>Quantity</FieldLabel><NumberInput inputMode="numeric" value={qty} onChange={e => setQty(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="0" className="mt-1 text-3xl text-center font-bold !py-4" /></div>
         </div>
         <div>
           <FieldLabel>Reason for change <span className="text-red-400 normal-case font-normal">(required)</span></FieldLabel>

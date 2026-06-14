@@ -24,9 +24,12 @@ function managerFloorDate() {
   const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - MANAGER_HISTORY_MONTHS)
   return d.toISOString().slice(0, 10)
 }
-import { rateOn, currentOpenRate, dayBefore, rateTimeline, isRateActiveNow, statement, statementsCSV, today as todayCalc, nextPaymentSlip, newPayment } from '../logic/pay'
+import { rateOn, currentOpenRate, dayBefore, rateTimeline, isRateActiveNow, statement, statementsCSV, today as todayCalc, nextPaymentSlip, newPayment, buildLedger } from '../logic/pay'
 
 const money = (n) => '₹' + fmtNum(Math.round(Number(n) || 0))
+// Piece RATES may carry up to 2 decimals (e.g. ₹8.50, ₹13.25). Money TOTALS stay whole-rupee.
+const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100
+const rate$ = (n) => '₹' + round2(n).toLocaleString('en-IN', { maximumFractionDigits: 2 })
 const rProductName = (r) => r.productName || r.product || '' // tolerate legacy rate records
 
 export default function ContractorPay({ owner = false, by = 'owner' }) {
@@ -47,6 +50,7 @@ export default function ContractorPay({ owner = false, by = 'owner' }) {
   const [rateProcess, setRateProcess] = useState('welding')
   const [rateContractor, setRateContractor] = useState('') // '' = all contractors
   const [effFrom, setEffFrom] = useState(todayStr())       // new rate starts this date (today or future)
+  const [editRate, setEditRate] = useState(null)   // rate record being edited (fix date/value)
   const [pay, setPay] = useState(null)             // {contractor}
 
   const mgrMinDate = owner ? undefined : managerFloorDate()
@@ -57,7 +61,9 @@ export default function ContractorPay({ owner = false, by = 'owner' }) {
   const to   = mode === 'day' ? day : `${month}-31`
   const periodLabel = mode === 'day' ? fmtDate(day) : month
   const periodShort = mode === 'day' ? 'Day' : 'Month'
-  const opts = useMemo(() => ({ product: prodFilter, finish: finishFilter }), [prodFilter, finishFilter])
+  // Material/reference products (paid via the material/dispatch flow) are excluded from hisab.
+  const refProducts = useMemo(() => new Set(products.list.filter(p => p.referenceOnly).map(p => p.name)), [products.list])
+  const opts = useMemo(() => ({ product: prodFilter, finish: finishFilter, exclude: refProducts }), [prodFilter, finishFilter, refProducts])
 
   const list = welders.list.filter(w => !filter || w.name === filter)
   const sortedProducts = useMemo(() => [...products.list].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)), [products.list])
@@ -72,7 +78,7 @@ export default function ContractorPay({ owner = false, by = 'owner' }) {
    * record. Supports future-dated (scheduled) changes via `effFrom`.
    */
   const applyRateChange = (product, productId, value) => {
-    const v = Number(value) || 0
+    const v = round2(value)   // allow up to 2 decimals (₹8.50), block longer fractions
     if (v === effectiveRate(product)) return // no real change → don't create a record
     const cur = currentOpenRate(rates.list, product, rateContractor, rateProcess, effFrom)
     if (cur) {
@@ -95,6 +101,25 @@ export default function ContractorPay({ owner = false, by = 'owner' }) {
     rates.update(r.id, { isActive: false })
     log('RATE_OFF', `${rProductName(r)}${r.contractor ? ' · ' + r.contractor : ''} ₹${r.rate} deactivated`, by)
     show('Rate deactivated ✓')
+  }
+
+  // Fix a saved rate's PERIOD (effective-from / to) or value — e.g. a rate
+  // recorded "from 14 June" by mistake, change it to start 1 May. Logged.
+  const saveRateEdit = ({ effectiveFrom, effectiveTo, rate }) => {
+    const r = editRate
+    const v = round2(rate)
+    rates.update(r.id, { effectiveFrom, effectiveTo: effectiveTo || '', rate: v, isActive: true })
+    log('RATE_EDIT', `${rProductName(r)}${r.contractor ? ' · ' + r.contractor : ''}: was ₹${r.rate} from ${r.effectiveFrom || '—'} → ₹${v} from ${effectiveFrom}${effectiveTo ? ' to ' + effectiveTo : ''}`, by, r.id)
+    setEditRate(null); show('Rate period updated ✓')
+  }
+
+  // Permanently remove a wrong rate (owner-only, reason required, logged).
+  const deleteRate = (r) => {
+    const reason = prompt(`PERMANENTLY DELETE this rate?\n${rProductName(r)}${r.contractor ? ' · ' + r.contractor : ''} · ₹${r.rate} from ${r.effectiveFrom || '—'}\nThis cannot be undone. Reason (required):`)
+    if (reason === null) return
+    if (!reason.trim()) return show('Reason required — not deleted', 2500)
+    log('RATE_DELETE', `${rProductName(r)}${r.contractor ? ' · ' + r.contractor : ''} ₹${r.rate} from ${r.effectiveFrom || '—'} deleted · reason: ${reason.trim()}`, by, r.id)
+    rates.remove(r.id); show('Rate deleted ✓')
   }
 
   const timeline = useMemo(() => {
@@ -122,7 +147,7 @@ export default function ContractorPay({ owner = false, by = 'owner' }) {
     doc.setFontSize(10); doc.text(`${st.contractor}   ·   ${periodLabel}`, 14, 24)
     autoTable(doc, {
       startY: 30, head: [['Product', 'Pieces', 'Rate/pc', 'Amount']],
-      body: st.products.map(p => [p.product, fmtNum(p.qty), p.mixed ? 'mixed' : money(p.rate), money(p.amount)]),
+      body: st.products.map(p => [p.product, fmtNum(p.qty), p.mixed ? 'mixed' : rate$(p.rate), money(p.amount)]),
       foot: [['Total', fmtNum(st.totalPieces), '', money(st.payable)]],
       theme: 'grid', headStyles: { fillColor: [217, 119, 6] }, footStyles: { fillColor: [241, 245, 249], textColor: 20 },
     })
@@ -133,6 +158,34 @@ export default function ContractorPay({ owner = false, by = 'owner' }) {
     doc.text(`Balance (${periodShort.toLowerCase()}): ${money(st.balance)}`, 14, y); y += 7
     doc.text(`Outstanding (all-time): ${money(st.outstanding)}`, 14, y)
     doc.save(`statement-${st.contractor}-${periodLabel}.pdf`)
+  }
+
+  // Full month HISAB: opening b/f + piece production + material(dispatch) + advances/payments → closing.
+  const generateHisab = (contractor) => {
+    const led = buildLedger(dispatches.list, rates.list, payments.list, ledger.list, contractor, from, to, refProducts)
+    const earned = led.summary.production + led.lines.filter(l => l.type === 'Material (dispatch)').reduce((s, l) => s + l.debit, 0)
+    const doc = new jsPDF()
+    doc.setFontSize(16); doc.text('UNICO — Welder Hisab', 14, 16)
+    doc.setFontSize(11); doc.text(`${contractor}`, 14, 24); doc.text(`Month: ${periodLabel}`, 14, 30)
+    doc.setFontSize(10); doc.text(`Opening balance b/f: ${money(led.opening)}`, 14, 37)
+    autoTable(doc, {
+      startY: 41,
+      head: [['Date', 'Type', 'Details', 'Earned', 'Given', 'Balance']],
+      body: led.lines.map(l => [fmtDate(l.date), l.type, l.description, l.debit ? money(l.debit) : '', l.credit ? money(l.credit) : '', money(l.runningBalance)]),
+      foot: [['', '', 'Closing balance', money(earned), money(led.summary.payment + led.summary.advance), money(led.closing)]],
+      theme: 'grid', styles: { fontSize: 8 }, headStyles: { fillColor: [217, 119, 6] }, footStyles: { fillColor: [241, 245, 249], textColor: 20, fontStyle: 'bold' },
+    })
+    let y = doc.lastAutoTable.finalY + 8
+    doc.setFontSize(11)
+    const closing = led.closing
+    doc.text(`Total earned (piece + material): ${money(earned)}`, 14, y); y += 7
+    doc.text(`Advances + payments: ${money(led.summary.advance + led.summary.payment)}`, 14, y); y += 7
+    doc.setFont(undefined, 'bold')
+    doc.text(closing >= 0 ? `Net PAYABLE to ${contractor}: ${money(closing)}` : `Advance carried forward: ${money(-closing)}`, 14, y); y += 12
+    doc.setFont(undefined, 'normal'); doc.setFontSize(9)
+    doc.text('Welder sign: ____________________', 14, y); doc.text('Owner sign: ____________________', 110, y)
+    doc.save(`hisab-${contractor}-${periodLabel}.pdf`)
+    show('Hisab PDF generated ✓')
   }
 
   const exportExcel = () => {
@@ -191,9 +244,9 @@ export default function ContractorPay({ owner = false, by = 'owner' }) {
             </div>
             {owner && (
               <div>
-                <FieldLabel>Effective from</FieldLabel>
+                <FieldLabel>Effective from (you can BACKDATE — pick a past date like 1 May)</FieldLabel>
                 <DateInput className="mt-1" value={effFrom} onChange={e => setEffFrom(e.target.value)} />
-                <p className="text-[11px] text-slate-400 mt-1">Today applies now; a future date <b>schedules</b> the change. The current rate auto-closes the day before. Old rates are kept — past statements keep their old rate.</p>
+                <p className="text-[11px] text-slate-400 mt-1">Pick a <b>past</b> date to backdate, today to apply now, or a future date to <b>schedule</b>. The current rate auto-closes the day before. Old rates are kept — past statements keep their old rate. To fix a rate you already saved, use ✏️ in Rate History below.</p>
               </div>
             )}
             {rateContractor && <p className="text-[11px] text-amber-600">Special rate for <b>{rateContractor}</b> — overrides the “All contractors” rate.</p>}
@@ -206,8 +259,8 @@ export default function ContractorPay({ owner = false, by = 'owner' }) {
                   <div key={p.id} className="flex items-center gap-2">
                     <span className="flex-1 text-sm font-semibold text-slate-600">{p.name}</span>
                     {owner
-                      ? <NumberInput key={`${rateProcess}|${rateContractor}|${effFrom}|${p.id}`} className="w-24 !py-1.5 text-right" placeholder={rateContractor && common ? `${common} (all)` : '₹/pc'} defaultValue={eff || ''} onBlur={e => applyRateChange(p.name, p.id, e.target.value)} />
-                      : <span className="w-24 text-right font-mono text-sm text-slate-700">{money(rateOn(rates.list, p.name, rateContractor || '', todayStr(), rateProcess))}</span>}
+                      ? <NumberInput key={`${rateProcess}|${rateContractor}|${effFrom}|${p.id}`} inputMode="decimal" step="0.01" min="0" className="w-24 !py-1.5 text-right" placeholder={rateContractor && common ? `${common} (all)` : '₹/pc'} defaultValue={eff || ''} onBlur={e => applyRateChange(p.name, p.id, e.target.value)} />
+                      : <span className="w-24 text-right font-mono text-sm text-slate-700">{rate$(rateOn(rates.list, p.name, rateContractor || '', todayStr(), rateProcess))}</span>}
                   </div>
                 )
               })}
@@ -239,18 +292,22 @@ export default function ContractorPay({ owner = false, by = 'owner' }) {
                       <tr key={r.id} className={`border-t border-slate-100 ${active ? '' : 'text-slate-400'}`}>
                         <td className="py-1.5 pr-2 font-semibold text-slate-600">{rProductName(r)}</td>
                         <td className="pr-2">{r.contractor || 'All'}</td>
-                        <td className="pr-2 text-right font-mono">{money(r.rate)}</td>
+                        <td className="pr-2 text-right font-mono">{rate$(r.rate)}</td>
                         <td className="pr-2 whitespace-nowrap">{r.effectiveFrom ? fmtDate(r.effectiveFrom) : '—'}</td>
                         <td className="pr-2 whitespace-nowrap">{r.effectiveTo ? fmtDate(r.effectiveTo) : (r.isActive === false ? 'off' : 'open')}</td>
                         <td className="pr-1 text-center">{active ? <span className="text-emerald-600 font-bold">●</span> : <span className="text-slate-300">○</span>}</td>
-                        {owner && <td>{active && <button onClick={() => deactivateRate(r)} className="text-red-500 font-bold px-1" title="Deactivate">✕</button>}</td>}
+                        {owner && <td className="whitespace-nowrap text-right">
+                          <button onClick={() => setEditRate(r)} className="px-1" title="Edit date / rate">✏️</button>
+                          {active && <button onClick={() => deactivateRate(r)} className="px-1" title="Deactivate (keep in history)">⏸</button>}
+                          <button onClick={() => deleteRate(r)} className="px-1" title="Delete permanently">🗑</button>
+                        </td>}
                       </tr>
                     )
                   })}
                 </tbody>
               </table>
             )}
-            <p className="text-[11px] text-slate-400 mt-2">Rates are never deleted — only deactivated. ● = in effect today.</p>
+            <p className="text-[11px] text-slate-400 mt-2">✏️ edit date/rate · ⏸ deactivate (keep in history) · 🗑 delete permanently. ● = in effect today.</p>
           </div>
         )}
       </Card>
@@ -259,11 +316,17 @@ export default function ContractorPay({ owner = false, by = 'owner' }) {
       {/* Per-contractor statements */}
       {statements.map(st => {
         const t = todayCalc(dispatches.list, rates.list, st.contractor, todayStr(), opts)
+        const refPcs = refProducts.size
+          ? dispatches.list.filter(d => d.welder === st.contractor && Number(d.qty) > 0 && refProducts.has(d.productName) && d.date >= from && d.date <= to).reduce((s, d) => s + Number(d.qty), 0)
+          : 0
         return (
           <Card key={st.contractor} className="p-5 space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <div className="font-bold text-lg text-slate-800">{st.contractor}</div>
-              <Button size="sm" variant="neutral" onClick={() => exportPDF(st)}>📄 PDF</Button>
+              <div className="flex gap-2">
+                <Button size="sm" variant="neutral" onClick={() => exportPDF(st)}>📄 Products</Button>
+                <Button size="sm" variant="success" onClick={() => generateHisab(st.contractor)}>🧾 Generate Hisab</Button>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
@@ -274,9 +337,13 @@ export default function ContractorPay({ owner = false, by = 'owner' }) {
             {st.products.length > 0 && (
               <div className="space-y-1">
                 {st.products.map(p => (
-                  <div key={p.product} className="flex justify-between text-sm"><span className="text-slate-600">{p.product} <span className="text-slate-400">× {fmtNum(p.qty)} @ {p.mixed ? 'mixed' : money(p.rate)}</span></span><span className="font-mono font-semibold text-slate-700">{money(p.amount)}</span></div>
+                  <div key={p.product} className="flex justify-between text-sm"><span className="text-slate-600">{p.product} <span className="text-slate-400">× {fmtNum(p.qty)} @ {p.mixed ? 'mixed' : rate$(p.rate)}</span></span><span className="font-mono font-semibold text-slate-700">{money(p.amount)}</span></div>
                 ))}
               </div>
+            )}
+
+            {refPcs > 0 && (
+              <div className="bg-amber-50 rounded-xl px-3 py-2 text-[11px] text-amber-700">📦 Material / reference: {fmtNum(refPcs)} pcs ({periodShort.toLowerCase()}) — paid via material/dispatch, <b>not</b> in this hisab.</div>
             )}
 
             <div className="border-t border-slate-100 pt-2 space-y-1 text-sm">
@@ -293,6 +360,28 @@ export default function ContractorPay({ owner = false, by = 'owner' }) {
         )
       })}
       {statements.length === 0 && <Card className="p-8 text-center text-slate-400">No contractors.</Card>}
+
+      {editRate && <EditRateForm rate={editRate} onSave={saveRateEdit} onCancel={() => setEditRate(null)} />}
+    </div>
+  )
+}
+
+function EditRateForm({ rate, onSave, onCancel }) {
+  const [from, setFrom] = useState(rate.effectiveFrom || todayStr())
+  const [to, setTo] = useState(rate.effectiveTo || '')
+  const [val, setVal] = useState(String(rate.rate ?? ''))
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-4" onClick={onCancel}>
+      <div className="bg-white rounded-2xl p-4 w-full max-w-sm space-y-3" onClick={e => e.stopPropagation()}>
+        <div className="font-bold text-slate-800">Fix rate · {rate.productName || rate.product}{rate.contractor ? ' · ' + rate.contractor : ' · All'}</div>
+        <div><FieldLabel>Rate ₹/pc</FieldLabel><NumberInput inputMode="decimal" step="0.01" min="0" className="mt-1" value={val} onChange={e => setVal(e.target.value)} /></div>
+        <div><FieldLabel>Effective FROM (backdate here, e.g. 1 May)</FieldLabel><DateInput className="mt-1" value={from} onChange={e => setFrom(e.target.value)} /></div>
+        <div><FieldLabel>Effective TO (leave blank = still applies)</FieldLabel><DateInput className="mt-1" value={to} onChange={e => setTo(e.target.value)} /></div>
+        <div className="flex gap-2 pt-1">
+          <Button variant="neutral" className="flex-1" onClick={onCancel}>Cancel</Button>
+          <Button variant="success" className="flex-1" onClick={() => onSave({ effectiveFrom: from, effectiveTo: to, rate: val })}>Save</Button>
+        </div>
+      </div>
     </div>
   )
 }
