@@ -211,7 +211,7 @@ export default function ContractorPay({ owner = false, by = 'owner' }) {
       payments.insert(newPayment({ slip, contractor, amount: dp, date: p.cutoff, mode: 'Cash', remark: 'Hisab settlement payment', paidByUser: '', paidByRole: myRole }))
       log('PAYMENT', `${slip} · ${contractor} ${money(dp)} (settlement)`, by, slip)
     }
-    const net = p.net + dp // dp reduces what we owe (credit)
+    const net = p.net - dp // dp reduces what we owe (credit)
     settlements.insert({
       welder: contractor, month: mode === 'day' ? day.slice(0, 7) : month, periodFrom: from, periodTo: p.cutoff,
       cutoffDate: p.cutoff, opening: 0, earned: p.earned, advances: p.advances, payments: p.paid + dp,
@@ -423,7 +423,7 @@ export default function ContractorPay({ owner = false, by = 'owner' }) {
 function FinalizeForm({ contractor, preview, periodLabel, onConfirm, onCancel }) {
   const [dayPay, setDayPay] = useState('')
   const dp = Number(dayPay) || 0
-  const finalNet = preview.net + dp
+  const finalNet = preview.net - dp
   return (
     <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-4" onClick={onCancel}>
       <div className="bg-white rounded-2xl p-4 w-full max-w-sm space-y-3" onClick={e => e.stopPropagation()}>

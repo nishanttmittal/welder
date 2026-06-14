@@ -11,7 +11,7 @@ import autoTable from 'jspdf-autotable'
 import { Button, Card, FieldLabel, NumberInput, Select, TextInput, DateInput, useToast, Toast } from '../../../core/ui'
 import { todayStr, fmtNum, fmtDate } from '../../../core/utils/format'
 import { useWelder } from '../WelderContext'
-import { statement, buildLedger, rateOn, lockedOn, nextPaymentSlip, newPayment, paidByLabel } from '../logic/pay'
+import { statement, buildLedger, lockedOn, nextPaymentSlip, newPayment, paidByLabel } from '../logic/pay'
 import { ADMIN_PASSWORD, PAYMENT_MODES } from '../config'
 
 const money = (n) => '₹' + fmtNum(Math.round(Number(n) || 0))
@@ -112,7 +112,7 @@ export default function Hisab({ owner = false, by = 'admin' }) {
       payments.insert(newPayment({ slip, contractor: welder, amount: dp, date: cutoff, mode: 'Cash', remark: 'Hisab settlement', paidByUser: '', paidByRole: myRole }))
       log('PAYMENT', `${slip} · ${welder} ${money(dp)} (settlement)`, by, slip)
     }
-    const net = closing + dp
+    const net = closing - dp   // paying him reduces what we owe (credit)
     settlements.insert({ welder, month, periodFrom: from, periodTo: cutoff, cutoffDate: cutoff, opening: led.opening, earned, advances: advTotal, payments: payTotal + dp, dayPayment: dp, net, finalizedBy: by, locked: true })
     log('SETTLEMENT_FINALIZE', `${welder} ${month} · earned ${money(earned)} net ${money(net)} (lock ≤ ${cutoff})`, by)
     show('Hisab finalized & locked ✓'); setFinalizing(false); exportPDF()
@@ -239,7 +239,7 @@ function EntryForm({ title, tone, withMode, onSave, onCancel }) {
 
 function FinalizeForm({ welder, month, cutoff, closing, onConfirm, onCancel }) {
   const [dayPay, setDayPay] = useState('')
-  const net = closing + (Number(dayPay) || 0)
+  const net = closing - (Number(dayPay) || 0)
   return (
     <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-4" onClick={onCancel}>
       <div className="bg-white rounded-2xl p-4 w-full max-w-sm space-y-3" onClick={e => e.stopPropagation()}>
