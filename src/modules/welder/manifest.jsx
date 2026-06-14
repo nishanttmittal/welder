@@ -7,6 +7,7 @@ import { todayStr } from '../../core/utils/format'
 import { totalSent } from './logic/report'
 import { INCHARGE_LABEL } from './config'
 import Entry from './pages/Entry'
+import Hisab from './pages/Hisab'
 import ContractorPay from './pages/ContractorPay'
 import Ledger from './pages/Ledger'
 import Advances from './pages/Advances'
@@ -51,7 +52,8 @@ export const welderModule = {
   pages: [
     { key: 'entry',     title: 'Material Sent',  desc: 'Gaadi + add products → save',           icon: '➕', color: 'from-amber-600 to-amber-700', floor: true, roles: ['incharge', 'owner'], Component: Entry },
     { key: 'history',   title: 'Entries',        desc: 'View & correct entries (48h window)',   icon: '🗂️', color: 'from-amber-500 to-amber-600', roles: ['incharge', 'owner'], Component: History },
-    { key: 'pay',       title: 'Contractor Pay', desc: 'Piece-rate earnings & statements',      icon: '💰', color: 'from-emerald-600 to-emerald-700', roles: ['incharge', 'owner'], Component: ContractorPay },
+    { key: 'hisab',     title: 'Hisab',          desc: 'Earnings, advances, payments & balance — all in one', icon: '💰', color: 'from-emerald-600 to-emerald-700', roles: ['incharge', 'owner'], Component: Hisab },
+    { key: 'pay',       title: 'Rates & Reports', desc: 'Set piece rates · detailed statements (owner)', icon: '📈', color: 'from-emerald-500 to-emerald-600', roles: ['incharge', 'owner'], Component: ContractorPay },
     { key: 'ledger',    title: 'Contractor Ledger', desc: 'Running balance, advances, settlement', icon: '📒', color: 'from-teal-600 to-teal-700', roles: ['incharge', 'owner'], Component: Ledger },
     { key: 'advances',  title: 'Manage Advances', desc: 'Edit / delete / fix wrong-name advances & payments', icon: '💵', color: 'from-rose-600 to-rose-700', roles: ['owner'], Component: Advances },
     { key: 'dashboard', title: 'Dashboard',      desc: 'Daily totals, by welder & party',      icon: '📊', color: 'from-blue-600 to-blue-700',   roles: ['incharge', 'owner'], Component: Dashboard },
