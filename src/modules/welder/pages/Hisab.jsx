@@ -188,8 +188,8 @@ export default function Hisab({ owner = false, by = 'admin' }) {
             <span className="font-mono font-bold text-slate-700">{money(l.credit)}</span>
           </div>
         ))}
-        <div className="grid grid-cols-2 gap-2 pt-1">
-          <Button size="sm" className="!bg-amber-500 !text-white" onClick={() => setForm('advance')}>＋ Advance</Button>
+        <div className={`grid ${owner ? 'grid-cols-2' : 'grid-cols-1'} gap-2 pt-1`}>
+          {owner && <Button size="sm" className="!bg-amber-500 !text-white" onClick={() => setForm('advance')}>＋ Advance</Button>}
           <Button size="sm" variant="success" onClick={() => setForm('payment')}>＋ Payment</Button>
         </div>
       </Card>

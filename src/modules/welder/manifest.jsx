@@ -50,17 +50,18 @@ export const welderModule = {
   //  • Owner (admin) only: export/share, materials, plating outbox + admin
   //    (rates/users/backup/reset).
   pages: [
-    { key: 'entry',     title: 'Material Sent',  desc: 'Gaadi + add products → save',           icon: '➕', color: 'from-amber-600 to-amber-700', floor: true, roles: ['incharge', 'owner'], Component: Entry },
-    { key: 'history',   title: 'Entries',        desc: 'View & correct entries (48h window)',   icon: '🗂️', color: 'from-amber-500 to-amber-600', roles: ['incharge', 'owner'], Component: History },
-    { key: 'hisab',     title: 'Hisab',          desc: 'Earnings, advances, payments & balance — all in one', icon: '💰', color: 'from-emerald-600 to-emerald-700', roles: ['incharge', 'owner'], Component: Hisab },
-    { key: 'dashboard', title: 'Dashboard',      desc: 'Daily totals, by welder, product & party', icon: '📊', color: 'from-blue-600 to-blue-700',   roles: ['incharge', 'owner'], Component: Dashboard },
-    { key: 'export',    title: 'Export / Share', desc: 'Daily PDF report for WhatsApp',         icon: '📄', color: 'from-violet-600 to-violet-700', roles: ['owner'], Component: Export },
-    { key: 'stock',     title: 'Raw Material Stock', desc: 'Balance + add incoming stock',      icon: '📦', color: 'from-cyan-600 to-cyan-700',   roles: ['incharge', 'owner'], Component: RawMaterialStock },
-    { key: 'materials', title: 'Materials & Recipe', desc: 'Raw materials + product recipes',   icon: '🧪', color: 'from-indigo-600 to-indigo-700', roles: ['owner'], Component: MaterialsRecipe },
-    // ---- owner tools (secondary; daily money work happens in Hisab) ----
-    { key: 'pay',       title: 'Rates & Reports', desc: 'Set piece rates · detailed statements', icon: '📈', color: 'from-emerald-500 to-emerald-600', roles: ['owner'], Component: ContractorPay },
-    { key: 'ledger',    title: 'Contractor Ledger', desc: 'Full running balance & settlement (advanced)', icon: '📒', color: 'from-teal-600 to-teal-700', roles: ['owner'], Component: Ledger },
-    { key: 'advances',  title: 'Manage Advances', desc: 'Fix / reassign / delete advances & payments', icon: '💵', color: 'from-rose-600 to-rose-700', roles: ['owner'], Component: Advances },
-    { key: 'admin',     title: 'Admin',          desc: 'Rates, users, products, backup',       icon: '⚙️', color: 'from-slate-600 to-slate-700', roles: ['owner'], Component: Admin },
+    // ---- Daily work (everyone) ----
+    { key: 'entry',     group: 'Daily work', title: 'Material Sent',  desc: 'Gaadi + add products → save',           icon: '➕', color: 'from-amber-600 to-amber-700', floor: true, roles: ['incharge', 'owner'], Component: Entry },
+    { key: 'history',   group: 'Daily work', title: 'Entries',        desc: 'View & correct entries (48h window)',   icon: '🗂️', color: 'from-amber-500 to-amber-600', roles: ['incharge', 'owner'], Component: History },
+    { key: 'hisab',     group: 'Daily work', title: 'Hisab',          desc: 'Earnings, advances, payments & balance', icon: '💰', color: 'from-emerald-600 to-emerald-700', roles: ['incharge', 'owner'], Component: Hisab },
+    { key: 'dashboard', group: 'Daily work', title: 'Dashboard',      desc: 'Daily totals, by welder, product & party', icon: '📊', color: 'from-blue-600 to-blue-700',   roles: ['incharge', 'owner'], Component: Dashboard },
+    { key: 'stock',     group: 'Daily work', title: 'Raw Material Stock', desc: 'Balance + add incoming stock',      icon: '📦', color: 'from-cyan-600 to-cyan-700',   roles: ['incharge', 'owner'], Component: RawMaterialStock },
+    // ---- Owner tools (settings & money tools) ----
+    { key: 'export',    group: 'Owner tools', title: 'Export / Share', desc: 'Daily PDF report for WhatsApp',        icon: '📄', color: 'from-violet-600 to-violet-700', roles: ['owner'], Component: Export },
+    { key: 'pay',       group: 'Owner tools', title: 'Rates & Reports', desc: 'Set piece rates · detailed statements', icon: '📈', color: 'from-emerald-500 to-emerald-600', roles: ['owner'], Component: ContractorPay },
+    { key: 'ledger',    group: 'Owner tools', title: 'Contractor Ledger', desc: 'Full running balance & settlement', icon: '📒', color: 'from-teal-600 to-teal-700', roles: ['owner'], Component: Ledger },
+    { key: 'advances',  group: 'Owner tools', title: 'Manage Advances', desc: 'Fix / reassign / delete advances & payments', icon: '💵', color: 'from-rose-600 to-rose-700', roles: ['owner'], Component: Advances },
+    { key: 'materials', group: 'Owner tools', title: 'Materials & Recipe', desc: 'Raw materials + product recipes',  icon: '🧪', color: 'from-indigo-600 to-indigo-700', roles: ['owner'], Component: MaterialsRecipe },
+    { key: 'admin',     group: 'Owner tools', title: 'Admin',          desc: 'Rates, users, products, backup',       icon: '⚙️', color: 'from-slate-600 to-slate-700', roles: ['owner'], Component: Admin },
   ],
 }
