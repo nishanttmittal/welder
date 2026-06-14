@@ -29,6 +29,19 @@ export default function Dashboard() {
   const monthFrom = date.slice(0, 8) + '01'
   const monthTotal = useMemo(() => totalSent(list, monthFrom, date), [list, monthFrom, date])
 
+  // Product-wise totals: pieces of each product for the day + month-to-date.
+  const productSummary = useMemo(() => {
+    const map = {}
+    for (const d of list) {
+      const q = Number(d.qty) || 0
+      if (q <= 0 || d.date < monthFrom || d.date > date) continue
+      const m = (map[d.productName] = map[d.productName] || { name: d.productName, day: 0, month: 0 })
+      if (d.date === date) m.day += q
+      m.month += q
+    }
+    return Object.values(map).sort((a, b) => b.month - a.month)
+  }, [list, date, monthFrom])
+
   return (
     <div className="max-w-lg mx-auto p-4 space-y-4">
       <Card className="p-4 flex items-center justify-between">
@@ -56,6 +69,28 @@ export default function Dashboard() {
                 <span className="font-mono font-bold text-amber-700">{fmtNum(w.qty)} pcs</span>
               </div>
             ))}
+          </div>
+        )}
+      </Card>
+
+      {/* Products sent — total per product (day + month-to-date) */}
+      <Card className="p-5">
+        <FieldLabel>Products sent · day & month-to-date</FieldLabel>
+        {productSummary.length === 0 ? (
+          <p className="text-sm text-slate-400 mt-3">No production this month.</p>
+        ) : (
+          <div className="mt-3">
+            <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 px-3 pb-1">
+              <span>Product</span><span className="flex gap-6"><span className="w-16 text-right">{fmtDate(date)}</span><span className="w-16 text-right">Month</span></span>
+            </div>
+            <div className="space-y-1">
+              {productSummary.map(p => (
+                <div key={p.name} className="flex items-center justify-between text-sm bg-slate-50 rounded-lg px-3 py-2">
+                  <span className="font-semibold text-slate-700">{p.name}</span>
+                  <span className="flex gap-6 font-mono"><span className="w-16 text-right text-amber-700 font-bold">{p.day ? fmtNum(p.day) : '·'}</span><span className="w-16 text-right text-slate-600">{fmtNum(p.month)}</span></span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </Card>
