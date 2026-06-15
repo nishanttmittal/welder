@@ -13,7 +13,7 @@ import autoTable from 'jspdf-autotable'
 import { Button, Card, FieldLabel, NumberInput, Select, TextInput, DateInput, useToast, Toast } from '../../../core/ui'
 import { todayStr, fmtNum, fmtDate } from '../../../core/utils/format'
 import { useWelder } from '../WelderContext'
-import { rateOn, lockedOn, nextPaymentSlip, newPayment, paidByLabel } from '../logic/pay'
+import { computeHisab, lockedOn, nextPaymentSlip, newPayment, paidByLabel } from '../logic/pay'
 import { ADMIN_PASSWORD, PAYMENT_MODES } from '../config'
 
 const num = (v) => Number(v) || 0
@@ -21,57 +21,6 @@ const money = (n) => '₹' + fmtNum(Math.round(num(n)))
 const rate$ = (n) => '₹' + (Math.round(num(n) * 100) / 100).toLocaleString('en-IN', { maximumFractionDigits: 2 })
 const shiftMonth = (ym, d) => { const [y, m] = ym.split('-').map(Number); const dt = new Date(y, m - 1 + d, 1); return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}` }
 const monthLabel = (ym) => { const [y, m] = ym.split('-').map(Number); return new Date(y, m - 1, 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' }) }
-
-/** The whole hisab for one welder + month — see file header for the rule. */
-function computeHisab({ dispatches, rates, payments, ledger, settlements, refProducts, welder, month, today }) {
-  const mFrom = `${month}-01`, mTo = `${month}-31`
-  const fin = settlements.filter(s => s.welder === welder && s.locked !== false)
-  const thisS = fin.find(s => s.month === month)
-  const prior = fin.filter(s => s.month < month).sort((a, b) => b.month.localeCompare(a.month))[0]
-  const opening = prior ? num(prior.net) : 0
-  const lowerCut = prior ? (prior.cutoffDate || '') : ''           // advances strictly after this
-  // The earliest UNFINALIZED month with any activity is the "open" month — it
-  // absorbs all advances up to today. Later unfinalized months show none yet.
-  const finMonths = new Set(fin.map(s => s.month))
-  const activeMonths = new Set()
-  for (const d of dispatches) if (d.welder === welder && num(d.qty) > 0 && d.date) activeMonths.add(d.date.slice(0, 7))
-  for (const e of ledger) if (e.contractor === welder && !e.reversed && e.date) activeMonths.add(e.date.slice(0, 7))
-  for (const p of payments) if (p.contractor === welder && !p.reversed && (p.paymentDate || p.date)) activeMonths.add((p.paymentDate || p.date).slice(0, 7))
-  const openMonth = [...activeMonths].filter(m => m && !finMonths.has(m)).sort()[0] || month
-  const advUpper = thisS ? (thisS.cutoffDate || mTo) : (month === openMonth ? today : (month > openMonth ? '' : mTo)) // ...up to here
-
-  // Production (piece-rate), this calendar month, reference products excluded.
-  const pieceMap = {}
-  for (const d of dispatches) {
-    if (d.welder !== welder || !(num(d.qty) > 0) || refProducts.has(d.productName)) continue
-    if ((d.date || '') < mFrom || (d.date || '') > mTo) continue
-    const rt = rateOn(rates, d.productName, welder, d.date)
-    const m = pieceMap[d.productName] = pieceMap[d.productName] || { product: d.productName, qty: 0, amount: 0, _r: new Set() }
-    m.qty += num(d.qty); m.amount += num(d.qty) * rt; m._r.add(rt)
-  }
-  const pieceProducts = Object.values(pieceMap).map(m => ({ product: m.product, qty: m.qty, amount: m.amount, rate: m._r.size > 1 ? null : [...m._r][0] || 0, mixed: m._r.size > 1 })).sort((a, b) => b.amount - a.amount)
-  const earnedPiece = pieceProducts.reduce((s, p) => s + p.amount, 0)
-
-  // Material (paid via dispatch) — ledger 'material' lines dated this month.
-  const matLines = ledger.filter(e => e.contractor === welder && e.type === 'material' && !e.reversed && (e.date || '') >= mFrom && (e.date || '') <= mTo)
-    .map(e => ({ desc: (e.note || 'Material').replace(/^Material \(dispatch[^)]*\):\s*/, ''), amount: num(e.amount) }))
-  const earnedMaterial = matLines.reduce((s, l) => s + l.amount, 0)
-  const earned = earnedPiece + earnedMaterial
-
-  // Advances / payments in (lowerCut, advUpper].
-  const inWin = (d) => (d || '') > lowerCut && (d || '') <= advUpper
-  const advList = ledger.filter(e => e.contractor === welder && !e.reversed && ['advance', 'opening', 'adjustment'].includes(e.type) && inWin(e.date))
-    .map(e => ({ date: e.date, label: e.type === 'opening' ? 'Opening' : e.type === 'adjustment' ? 'Adjustment' : 'Advance', note: e.note, amount: e.direction === 'debit' ? -num(e.amount) : num(e.amount) }))
-    .sort((a, b) => (a.date || '').localeCompare(b.date || ''))
-  const advTotal = advList.reduce((s, a) => s + a.amount, 0)
-  const payList = payments.filter(p => p.contractor === welder && !p.reversed && inWin(p.paymentDate || p.date))
-    .map(p => ({ date: p.paymentDate || p.date, slip: p.paymentSlipNo, mode: p.paymentMode, amount: num(p.amount) }))
-    .sort((a, b) => (a.date || '').localeCompare(b.date || ''))
-  const payTotal = payList.reduce((s, p) => s + p.amount, 0)
-
-  const net = opening + earned - advTotal - payTotal
-  return { opening, advUpper, locked: !!thisS, settlement: thisS || null, pieceProducts, matLines, earnedPiece, earnedMaterial, earned, advList, advTotal, payList, payTotal, net }
-}
 
 export default function Hisab({ owner = false, by = 'admin' }) {
   const { dispatches, products, rates, payments, ledger, settlements, welders, log } = useWelder()

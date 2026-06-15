@@ -162,6 +162,84 @@ export function lockedOn(settlements, welder, date) {
 export const paidByLabel = (user, role) =>
   user && role ? `${user} (${role})` : (user || role || '')
 
+/**
+ * THE hisab for one welder + month. The rule:
+ *  • Production & material are counted in their own calendar month.
+ *  • Advances/payments/adjustments belong to the OPEN settlement period —
+ *    from the last finalized cut-off up to today (or this month's cut-off if
+ *    already finalized). The earliest unfinalized month with activity is the
+ *    "open" month; only it absorbs advances until it is finalized.
+ *  • Opening = the carry-forward net of the previous finalized month.
+ * Returns aggregates (for Hisab) + ordered dated `lines` w/ running balance
+ * (for the Ledger). Used by both screens so they always agree.
+ */
+export function computeHisab({ dispatches, rates, payments, ledger, settlements, refProducts, welder, month, today }) {
+  const ref = refProducts || new Set()
+  const mFrom = `${month}-01`, mTo = `${month}-31`
+  const fin = (settlements || []).filter(s => s.welder === welder && s.locked !== false)
+  const thisS = fin.find(s => s.month === month) || null
+  const prior = fin.filter(s => s.month < month).sort((a, b) => b.month.localeCompare(a.month))[0]
+  const opening = prior ? num(prior.net) : 0
+  const lowerCut = prior ? (prior.cutoffDate || '') : ''
+  const finMonths = new Set(fin.map(s => s.month))
+  const activeMonths = new Set()
+  for (const d of dispatches) if (d.welder === welder && num(d.qty) > 0 && d.date) activeMonths.add(d.date.slice(0, 7))
+  for (const e of ledger) if (e.contractor === welder && !e.reversed && e.date) activeMonths.add(e.date.slice(0, 7))
+  for (const p of payments) if (p.contractor === welder && !p.reversed && (p.paymentDate || p.date)) activeMonths.add((p.paymentDate || p.date).slice(0, 7))
+  const openMonth = [...activeMonths].filter(m => m && !finMonths.has(m)).sort()[0] || month
+  const advUpper = thisS ? (thisS.cutoffDate || mTo) : (month === openMonth ? today : (month > openMonth ? '' : mTo))
+  const inWin = (d) => (d || '') > lowerCut && (d || '') <= advUpper
+
+  const lines = []
+  // Production (piece) — per dispatch, this month, reference products excluded.
+  const pieceMap = {}
+  for (const d of dispatches) {
+    if (d.welder !== welder || !(num(d.qty) > 0) || ref.has(d.productName)) continue
+    if ((d.date || '') < mFrom || (d.date || '') > mTo) continue
+    const rt = rateOn(rates, d.productName, welder, d.date)
+    const amt = num(d.qty) * rt
+    lines.push({ date: d.date, type: 'Production', desc: `${d.finishedName || d.productName} × ${num(d.qty)} @ ₹${rt}`, debit: amt, credit: 0, _s: d.createdAt || '' })
+    const m = pieceMap[d.productName] = pieceMap[d.productName] || { product: d.productName, qty: 0, amount: 0, _r: new Set() }
+    m.qty += num(d.qty); m.amount += amt; m._r.add(rt)
+  }
+  const pieceProducts = Object.values(pieceMap).map(m => ({ product: m.product, qty: m.qty, amount: m.amount, rate: m._r.size > 1 ? null : [...m._r][0] || 0, mixed: m._r.size > 1 })).sort((a, b) => b.amount - a.amount)
+  const earnedPiece = pieceProducts.reduce((s, p) => s + p.amount, 0)
+  // Material (paid via dispatch)
+  const matLines = []
+  for (const e of ledger) {
+    if (e.contractor !== welder || e.type !== 'material' || e.reversed) continue
+    if ((e.date || '') < mFrom || (e.date || '') > mTo) continue
+    const desc = (e.note || 'Material').replace(/^Material \(dispatch[^)]*\):\s*/, '')
+    matLines.push({ desc, amount: num(e.amount) }); lines.push({ date: e.date, type: 'Material', desc, debit: num(e.amount), credit: 0, _s: e.createdAt || '' })
+  }
+  const earnedMaterial = matLines.reduce((s, l) => s + l.amount, 0)
+  const earned = earnedPiece + earnedMaterial
+  // Advances / opening / adjustments / payments — in the open window.
+  const advList = [], payList = []; let adjNet = 0
+  for (const e of ledger) {
+    if (e.contractor !== welder || e.reversed || !['advance', 'opening', 'adjustment'].includes(e.type) || !inWin(e.date)) continue
+    const amt = num(e.amount), isDebit = e.direction === 'debit'
+    const label = e.type === 'opening' ? 'Opening' : e.type === 'adjustment' ? 'Adjustment' : 'Advance'
+    lines.push({ date: e.date, type: label, desc: e.note || label, debit: isDebit ? amt : 0, credit: isDebit ? 0 : amt, _s: e.createdAt || '' })
+    if (e.type === 'adjustment') adjNet += (isDebit ? amt : -amt)
+    else advList.push({ date: e.date, label, note: e.note, amount: isDebit ? -amt : amt })
+  }
+  for (const p of payments) {
+    if (p.contractor !== welder || p.reversed || !inWin(p.paymentDate || p.date)) continue
+    const amt = num(p.amount)
+    lines.push({ date: p.paymentDate || p.date, type: 'Payment', desc: 'Payment' + (p.paymentSlipNo ? ' · ' + p.paymentSlipNo : '') + (p.remark ? ' · ' + p.remark : ''), debit: 0, credit: amt, _s: p.createdAt || '' })
+    payList.push({ date: p.paymentDate || p.date, slip: p.paymentSlipNo, mode: p.paymentMode, amount: amt })
+  }
+  const advTotal = advList.reduce((s, a) => s + a.amount, 0)
+  const payTotal = payList.reduce((s, p) => s + p.amount, 0)
+  // order lines + running balance (starting from opening)
+  lines.sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a._s || '').localeCompare(b._s || ''))
+  let bal = opening
+  for (const l of lines) { bal += l.debit - l.credit; l.runningBalance = bal }
+  const net = bal
+  return { opening, advUpper, lowerCut, locked: !!thisS, settlement: thisS, openMonth, pieceProducts, matLines, earnedPiece, earnedMaterial, earned, advList, advTotal, payList, payTotal, adjNet, net, lines }
+}
+
 /** Full statement for one contractor over a period + all-time outstanding. */
 export function statement(dispatches, rates, payments, contractor, from, to, opts = {}) {
   const products = productWise(dispatches, rates, contractor, from, to, opts)
