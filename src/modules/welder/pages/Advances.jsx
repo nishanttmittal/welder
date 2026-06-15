@@ -12,7 +12,7 @@ import { Button, Card, FieldLabel, NumberInput, Select, TextInput, DateInput, us
 import { todayStr, fmtNum, fmtDate } from '../../../core/utils/format'
 import { useWelder } from '../WelderContext'
 import { PAYMENT_MODES, ADMIN_PASSWORD } from '../config'
-import { buildLedger, nextPaymentSlip, newPayment } from '../logic/pay'
+import { buildLedger, nextPaymentSlip, newPayment, lockedOn } from '../logic/pay'
 
 const money = (n) => '₹' + fmtNum(Math.round(Number(n) || 0))
 
@@ -21,7 +21,7 @@ const fromPayment = (p) => ({ source: 'payment', id: p.id, contractor: p.contrac
 const fromLedger = (l) => ({ source: 'ledger', id: l.id, contractor: l.contractor || '', amount: Number(l.amount) || 0, date: l.date || '', mode: '', remark: l.note || '', slip: '', reversed: !!l.reversed })
 
 export default function Advances({ owner = false, by = 'owner' }) {
-  const { dispatches, rates, payments, ledger, welders, log } = useWelder()
+  const { dispatches, rates, payments, ledger, welders, settlements, log } = useWelder()
   const { msg, show } = useToast()
   const [filter, setFilter] = useState('')          // contractor name or '' = all
   const [periodMode, setPeriodMode] = useState('all')   // 'all' | 'month'
@@ -49,9 +49,20 @@ export default function Advances({ owner = false, by = 'owner' }) {
 
   const coll = (src) => (src === 'payment' ? payments : ledger)
 
+  // Entries inside a finalized (locked) month need the admin password to change.
+  const lockGuard = (r) => {
+    const s = lockedOn(settlements?.list, r.contractor, r.date)
+    if (!s) return true
+    const pass = prompt(`${r.contractor}'s ${s.month} hisab is finalized & locked.\nEnter admin password to change this entry:`)
+    if (pass === null) return false
+    if (pass !== ADMIN_PASSWORD) { show('Wrong password — locked', 2500); return false }
+    return true
+  }
+
   const reassign = (r, name) => {
     if (!name || name === r.contractor) return
     if (!confirm(`Move ${money(r.amount)} from "${r.contractor}" to "${name}"?`)) return
+    if (!lockGuard(r)) return
     coll(r.source).update(r.id, { contractor: name })
     log('ADV_REASSIGN', `${r.slip || r.source} ${money(r.amount)}: ${r.contractor} → ${name} (${role})`, by)
     show('Reassigned ✓')
@@ -69,6 +80,7 @@ export default function Advances({ owner = false, by = 'owner' }) {
 
   const saveEdit = (patch) => {
     const r = edit
+    if (!lockGuard(r)) return
     if (r.source === 'payment') coll('payment').update(r.id, { amount: patch.amount, paymentDate: patch.date, date: patch.date, paymentMode: patch.mode, remark: patch.remark, note: patch.remark })
     else coll('ledger').update(r.id, { amount: patch.amount, date: patch.date, note: patch.remark })
     log('ADV_EDIT', `${r.slip || r.source} ${money(r.amount)}→${money(patch.amount)} · ${r.contractor} (${role})`, by)

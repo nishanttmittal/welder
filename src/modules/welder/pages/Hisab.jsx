@@ -66,6 +66,13 @@ export default function Hisab({ owner = false, by = 'admin' }) {
     log('PAYMENT', `${slip} · ${welder} ${money(v)} (${mode || 'Cash'})`, by, slip)
     show(`Payment ${slip} recorded ✓`); setForm(null)
   }
+  const addAdjustment = ({ amount, date, note, direction }) => {
+    const v = num(amount); if (v <= 0) return show('Enter amount', 2000)
+    if (!lockGuard(date)) return
+    ledger.insert({ contractor: welder, date, type: 'adjustment', direction: direction || 'credit', amount: v, note: (note || '').trim(), createdBy: paidByLabel('', myRole), reversed: false })
+    log('ADJUSTMENT', `${welder} adj ${direction === 'debit' ? '+' : '-'}${money(v)}${note ? ' · ' + note : ''} (${myRole})`, by)
+    show('Adjustment added ✓'); setForm(null)
+  }
 
   const exportPDF = () => {
     const doc = new jsPDF()
@@ -171,9 +178,12 @@ export default function Hisab({ owner = false, by = 'admin' }) {
           </div>
         ))}
         {!h.locked && (
-          <div className={`grid ${owner ? 'grid-cols-2' : 'grid-cols-1'} gap-2 pt-1`}>
-            {owner && <Button size="sm" className="!bg-amber-500 !text-white" onClick={() => setForm('advance')}>＋ Advance</Button>}
-            <Button size="sm" variant="success" onClick={() => setForm('payment')}>＋ Payment</Button>
+          <div className="space-y-2 pt-1">
+            <div className={`grid ${owner ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}>
+              {owner && <Button size="sm" className="!bg-amber-500 !text-white" onClick={() => setForm('advance')}>＋ Advance</Button>}
+              <Button size="sm" variant="success" onClick={() => setForm('payment')}>＋ Payment</Button>
+            </div>
+            {owner && <Button size="sm" variant="ghost" className="w-full" onClick={() => setForm('adjustment')}>＋ Adjustment (correction / bonus / deduction)</Button>}
           </div>
         )}
       </Card>
@@ -186,6 +196,7 @@ export default function Hisab({ owner = false, by = 'admin' }) {
 
       {form === 'advance' && <EntryForm title={`Advance to ${welder}`} tone="amber" withMode={false} onSave={addAdvance} onCancel={() => setForm(null)} />}
       {form === 'payment' && <EntryForm title={`Payment to ${welder}`} tone="emerald" withMode onSave={addPayment} onCancel={() => setForm(null)} />}
+      {form === 'adjustment' && <EntryForm title={`Adjustment · ${welder}`} tone="slate" withDirection onSave={addAdjustment} onCancel={() => setForm(null)} />}
       {finalizing && <FinalizeForm welder={welder} month={monthLabel(month)} closing={h.net} onConfirm={finalize} onCancel={() => setFinalizing(false)} />}
       <Toast msg={msg} />
     </div>
@@ -196,21 +207,27 @@ function Stat({ label, value, tone }) {
   return <div className="bg-white rounded-2xl border-2 border-slate-100 p-3 text-center"><div className={`text-base font-bold ${tone}`}>{value}</div><div className="text-[11px] text-slate-500">{label}</div></div>
 }
 
-function EntryForm({ title, tone, withMode, onSave, onCancel }) {
-  const [amount, setAmount] = useState(''); const [date, setDate] = useState(todayStr()); const [mode, setMode] = useState('Cash'); const [note, setNote] = useState('')
+function EntryForm({ title, tone, withMode, withDirection, onSave, onCancel }) {
+  const [amount, setAmount] = useState(''); const [date, setDate] = useState(todayStr()); const [mode, setMode] = useState('Cash'); const [note, setNote] = useState(''); const [direction, setDirection] = useState('credit')
   return (
     <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-4" onClick={onCancel}>
       <div className="bg-white rounded-2xl p-4 w-full max-w-sm space-y-3" onClick={e => e.stopPropagation()}>
         <div className="font-bold text-lg text-slate-800">{title}</div>
+        {withDirection && (
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => setDirection('credit')} className={`py-2 rounded-xl text-sm font-bold ${direction === 'credit' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600'}`}>− Reduce balance<div className="text-[10px] font-normal">(deduction)</div></button>
+            <button onClick={() => setDirection('debit')} className={`py-2 rounded-xl text-sm font-bold ${direction === 'debit' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}`}>＋ Add to balance<div className="text-[10px] font-normal">(bonus / owed)</div></button>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-2">
           <div><FieldLabel>Amount ₹</FieldLabel><NumberInput inputMode="decimal" className="mt-1 text-2xl text-center font-bold !py-3" placeholder="0" value={amount} onChange={e => setAmount(e.target.value)} /></div>
           <div><FieldLabel>Date</FieldLabel><DateInput className="mt-1" value={date} onChange={e => setDate(e.target.value)} /></div>
         </div>
         {withMode && <div><FieldLabel>Mode</FieldLabel><Select className="mt-1" value={mode} onChange={e => setMode(e.target.value)} options={PAYMENT_MODES.map(m => ({ value: m, label: m }))} /></div>}
-        <div><FieldLabel>Note (optional)</FieldLabel><TextInput className="mt-1" placeholder="e.g. PF, ONLINE" value={note} onChange={e => setNote(e.target.value)} /></div>
+        <div><FieldLabel>Note{withDirection ? ' (reason)' : ' (optional)'}</FieldLabel><TextInput className="mt-1" placeholder={withDirection ? 'e.g. damage deduction, diwali bonus' : 'e.g. PF, ONLINE'} value={note} onChange={e => setNote(e.target.value)} /></div>
         <div className="flex gap-2 pt-1">
           <Button variant="neutral" className="flex-1" onClick={onCancel}>Cancel</Button>
-          <Button variant={tone === 'emerald' ? 'success' : 'primary'} className={`flex-1 ${tone === 'emerald' ? '' : '!bg-amber-500 !text-white'}`} onClick={() => onSave({ amount, date, mode, note })}>Save</Button>
+          <Button variant={tone === 'emerald' ? 'success' : 'primary'} className={`flex-1 ${tone === 'emerald' || tone === 'slate' ? '' : '!bg-amber-500 !text-white'}`} onClick={() => onSave({ amount, date, mode, note, direction })}>Save</Button>
         </div>
       </div>
     </div>
