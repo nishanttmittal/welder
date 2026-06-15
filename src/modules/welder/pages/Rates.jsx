@@ -8,7 +8,7 @@ import { Button, Card, FieldLabel, NumberInput, Select, DateInput, useToast, Toa
 import { todayStr, fmtDate } from '../../../core/utils/format'
 import { useWelder } from '../WelderContext'
 import { rateOn, currentOpenRate, dayBefore, rateTimeline, isRateActiveNow } from '../logic/pay'
-import { PROCESSES, processLabel } from '../config'
+import { PROCESSES, processLabel, ADMIN_PASSWORD } from '../config'
 
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100
 const rate$ = (n) => '₹' + round2(n).toLocaleString('en-IN', { maximumFractionDigits: 2 })
@@ -21,6 +21,14 @@ export default function Rates({ by = 'owner' }) {
   const [rateContractor, setRateContractor] = useState('')   // '' = all contractors
   const [effFrom, setEffFrom] = useState(todayStr())
   const [editRate, setEditRate] = useState(null)
+  const [unlocked, setUnlocked] = useState(false)   // rates are LOCKED by default — unlock to edit
+
+  const unlock = () => {
+    const pwd = prompt('Rates are locked.\nEnter admin password to unlock and edit:')
+    if (pwd === null) return
+    if (pwd !== ADMIN_PASSWORD) return show('Wrong password — still locked', 2500)
+    setUnlocked(true); show('Rates unlocked — you can edit now')
+  }
 
   const sortedProducts = useMemo(() => [...products.list].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)), [products.list])
   const effectiveRate = (product) => rateOn(rates.list, product, rateContractor, effFrom, rateProcess)
@@ -30,6 +38,7 @@ export default function Rates({ by = 'owner' }) {
   }, [rates.list, rateProcess, rateContractor])
 
   const applyRateChange = (product, productId, value) => {
+    if (!unlocked) return
     const v = round2(value)
     if (v === effectiveRate(product)) return
     const cur = currentOpenRate(rates.list, product, rateContractor, rateProcess, effFrom)
@@ -63,6 +72,17 @@ export default function Rates({ by = 'owner' }) {
   return (
     <div className="max-w-lg mx-auto p-4 space-y-4">
       <Toast msg={msg} />
+      {unlocked ? (
+        <div className="flex items-center justify-between bg-emerald-50 border-2 border-emerald-200 rounded-2xl px-4 py-3">
+          <span className="text-sm font-bold text-emerald-700">🔓 Unlocked — you can edit rates</span>
+          <Button size="sm" variant="neutral" onClick={() => setUnlocked(false)}>🔒 Lock</Button>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between bg-rose-50 border-2 border-rose-200 rounded-2xl px-4 py-3">
+          <span className="text-sm font-bold text-rose-700">🔒 Rates locked (safe from accidental change)</span>
+          <Button size="sm" variant="primary" onClick={unlock}>Unlock to edit</Button>
+        </div>
+      )}
       <Card className="p-4 space-y-3">
         <div className="grid grid-cols-2 gap-2">
           <div><FieldLabel>Process</FieldLabel><Select className="mt-1" value={rateProcess} onChange={e => setRateProcess(e.target.value)} options={PROCESSES.map(p => ({ value: p.key, label: p.label }))} /></div>
@@ -80,7 +100,7 @@ export default function Rates({ by = 'owner' }) {
             return (
               <div key={p.id} className="flex items-center gap-2">
                 <span className="flex-1 text-sm font-semibold text-slate-600">{p.name}{p.referenceOnly ? ' 📦' : ''}</span>
-                <NumberInput key={`${rateProcess}|${rateContractor}|${effFrom}|${p.id}`} inputMode="decimal" step="0.01" min="0" className="w-24 !py-1.5 text-right" placeholder={rateContractor && common ? `${common} (all)` : '₹/pc'} defaultValue={effectiveRate(p.name) || ''} onBlur={e => applyRateChange(p.name, p.id, e.target.value)} />
+                <NumberInput key={`${rateProcess}|${rateContractor}|${effFrom}|${p.id}|${unlocked}`} inputMode="decimal" step="0.01" min="0" disabled={!unlocked} className={`w-24 !py-1.5 text-right ${unlocked ? '' : 'bg-slate-50 text-slate-500'}`} placeholder={rateContractor && common ? `${common} (all)` : '₹/pc'} defaultValue={effectiveRate(p.name) || ''} onBlur={e => applyRateChange(p.name, p.id, e.target.value)} />
               </div>
             )
           })}
@@ -105,9 +125,11 @@ export default function Rates({ by = 'owner' }) {
                       <td className="pr-2 whitespace-nowrap">{r.effectiveFrom ? fmtDate(r.effectiveFrom) : '—'}</td>
                       <td className="pr-2 whitespace-nowrap">{r.effectiveTo ? fmtDate(r.effectiveTo) : (r.isActive === false ? 'off' : 'open')}</td>
                       <td className="whitespace-nowrap text-right">
-                        <button onClick={() => setEditRate(r)} className="px-1" title="Edit">✏️</button>
-                        {active && <button onClick={() => deactivateRate(r)} className="px-1" title="Deactivate">⏸</button>}
-                        <button onClick={() => deleteRate(r)} className="px-1" title="Delete">🗑</button>
+                        {unlocked ? (<>
+                          <button onClick={() => setEditRate(r)} className="px-1" title="Edit">✏️</button>
+                          {active && <button onClick={() => deactivateRate(r)} className="px-1" title="Deactivate">⏸</button>}
+                          <button onClick={() => deleteRate(r)} className="px-1" title="Delete">🗑</button>
+                        </>) : <span className="text-slate-300">🔒</span>}
                       </td>
                     </tr>
                   )
