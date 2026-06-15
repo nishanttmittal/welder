@@ -188,16 +188,17 @@ export default function Ledger({ owner = false, by = 'owner' }) {
         <p className="text-center text-xs text-slate-500 mt-2">Closing: <b>{balLabel(led.closing)}</b></p>
       </Card>
 
-      {/* Add entries (Manager: payment only · Owner: all) */}
-      <Card className="p-3">
-        <div className={`grid gap-1.5 ${owner ? 'grid-cols-4' : 'grid-cols-1'}`}>
-          {entryButtons.map(t => (
-            <button key={t.key} onClick={() => setForm({ type: t.key, dir: t.dir })}
-              className="py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold active:scale-95">+ {t.label}</button>
-          ))}
-        </div>
-        {!owner && <p className="text-[11px] text-slate-400 mt-2">As Manager you can record payments. Advances, adjustments, rates and reversals are owner-only.</p>}
-      </Card>
+      <p className="text-center text-[11px] text-slate-400">This is a read-only running ledger. Add advances & payments in the <b>Hisab</b> screen. Adjustments: use ＋ below (owner).</p>
+      {owner && (
+        <Card className="p-3">
+          <div className="grid grid-cols-2 gap-1.5">
+            {ENTRY_TYPES.filter(t => t.key === 'adjustment' || t.key === 'opening').map(t => (
+              <button key={t.key} onClick={() => setForm({ type: t.key, dir: t.dir })}
+                className="py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold active:scale-95">+ {t.label}</button>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Ledger table */}
       <Card className="p-3 overflow-x-auto">

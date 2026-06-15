@@ -8,7 +8,7 @@ import { totalSent } from './logic/report'
 import { INCHARGE_LABEL } from './config'
 import Entry from './pages/Entry'
 import Hisab from './pages/Hisab'
-import ContractorPay from './pages/ContractorPay'
+import Rates from './pages/Rates'
 import Ledger from './pages/Ledger'
 import Advances from './pages/Advances'
 import RawMaterialStock from './pages/RawMaterialStock'
@@ -58,7 +58,7 @@ export const welderModule = {
     { key: 'stock',     group: 'Daily work', title: 'Raw Material Stock', desc: 'Balance + add incoming stock',      icon: '📦', color: 'from-cyan-600 to-cyan-700',   roles: ['incharge', 'owner'], Component: RawMaterialStock },
     // ---- Owner tools (settings & money tools) ----
     { key: 'export',    group: 'Owner tools', title: 'Export / Share', desc: 'Daily PDF report for WhatsApp',        icon: '📄', color: 'from-violet-600 to-violet-700', roles: ['owner'], Component: Export },
-    { key: 'pay',       group: 'Owner tools', title: 'Rates & Reports', desc: 'Set piece rates · detailed statements', icon: '📈', color: 'from-emerald-500 to-emerald-600', roles: ['owner'], Component: ContractorPay },
+    { key: 'pay',       group: 'Owner tools', title: 'Rates', desc: 'Set piece rate per product (with history)', icon: '📈', color: 'from-emerald-500 to-emerald-600', roles: ['owner'], Component: Rates },
     { key: 'ledger',    group: 'Owner tools', title: 'Contractor Ledger', desc: 'Full running balance & settlement', icon: '📒', color: 'from-teal-600 to-teal-700', roles: ['owner'], Component: Ledger },
     { key: 'advances',  group: 'Owner tools', title: 'Manage Advances', desc: 'Fix / reassign / delete advances & payments', icon: '💵', color: 'from-rose-600 to-rose-700', roles: ['owner'], Component: Advances },
     { key: 'materials', group: 'Owner tools', title: 'Materials & Recipe', desc: 'Raw materials + product recipes',  icon: '🧪', color: 'from-indigo-600 to-indigo-700', roles: ['owner'], Component: MaterialsRecipe },
