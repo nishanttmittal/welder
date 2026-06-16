@@ -9,7 +9,7 @@ import { useMemo, useState, useEffect, useRef } from 'react'
 import { Button, Card, FieldLabel, Select, NumberInput, TextInput, useToast, Toast } from '../../../core/ui'
 import { todayStr, daysAgoStr, fmtNum, fmtDate } from '../../../core/utils/format'
 import { useWelder } from '../WelderContext'
-import { FINISHES, finishedName, isPlatingFinish, SOURCE_APP, WORKFLOW_STAGE, DEFAULT_FACTORY_ID, PLATING_SYNC_FROM, MANAGER_BACKDATE_FROM, MANAGER_BACKDATE_TO } from '../config'
+import { FINISHES, finishedName, isPlatingFinish, SOURCE_APP, WORKFLOW_STAGE, DEFAULT_FACTORY_ID, PLATING_SYNC_FROM, FREEZE_BEFORE } from '../config'
 import { nextWelderChallan, last4 } from '../logic/platingBridge'
 import { computeStock, recipeOf } from '../logic/stock'
 import { makeId } from '../../../core/db/repository'
@@ -62,10 +62,22 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
     .filter(d => d.date === date && (!welder || d.welder === welder))
     .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
   const canEditDay = date >= daysAgoStr(2)
-  // Manager date rule: normally the last 7 days, PLUS the one-off May-2026
-  // backfill window. Owner & shop floor have their own windows and skip this.
-  const inMayBackfill = date >= MANAGER_BACKDATE_FROM && date <= MANAGER_BACKDATE_TO
-  const managerDateOk = floor || by === 'Owner' || date >= daysAgoStr(7) || inMayBackfill
+  // Manager date rule: the last 7 days. Owner & shop floor have their own windows.
+  const managerDateOk = floor || by === 'Owner' || date >= daysAgoStr(7)
+  // History freeze: nobody (incl. owner) may create/back-date before the cutoff.
+  const frozen = date < FREEZE_BEFORE
+
+  // This welder's own entries over the last 15 days, grouped by date (newest
+  // first) — a read-only review list so Jitender/Naveen can check what they
+  // entered and flag anything wrong to the owner.
+  const last15ByDate = useMemo(() => {
+    const cutoff = daysAgoStr(14)
+    const map = new Map()
+    dispatches.list
+      .filter(d => welder && d.welder === welder && (d.date || '') >= cutoff && Number(d.qty) > 0)
+      .forEach(d => { if (!map.has(d.date)) map.set(d.date, []); map.get(d.date).push(d) })
+    return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]))
+  }, [dispatches.list, welder])
 
   const openFix = (d) => { setFixing(d); setFixQty(String(d.qty)) }
   const saveFix = () => {
@@ -85,7 +97,8 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
     if (!party) return show('Pick where it is sent', 2000)
     if (plating && !gaadi.trim()) return show('Enter the gaadi (vehicle) number', 2500)
     if (filled.length === 0) return show('Add at least one product + quantity', 2500)
-    if (!managerDateOk) return show('That date is locked — use the last 7 days or a May 2026 date', 3000)
+    if (frozen) return show(`🔒 Dates before ${FREEZE_BEFORE} are locked (verified history). Pick 1 June 2026 or later.`, 3500)
+    if (!managerDateOk) return show('That date is locked — use the last 7 days', 3000)
     // Duplicate alarm: same product + same gaadi already entered today.
     const g = gaadi.trim()
     const dups = g ? filled.filter(it => dispatches.list.some(d => d.date === date && (d.gaadi || '') === g && d.productName === it.product && Number(d.qty) > 0)).map(it => it.product) : []
@@ -172,17 +185,20 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
               : <Select className="mt-1" value={welder} onChange={e => setWelder(e.target.value)} options={welders.list.map(w => ({ value: w.name, label: w.name }))} />}
           </div>
           <div>
-            <FieldLabel>Date {floor ? <span className="text-slate-400 font-normal normal-case">(today or last 2 days)</span> : (by !== 'Owner' && <span className="text-slate-400 font-normal normal-case">(last 7 days or May 2026)</span>)}</FieldLabel>
+            <FieldLabel>Date {floor ? <span className="text-slate-400 font-normal normal-case">(today or last 2 days)</span> : (by !== 'Owner' && <span className="text-slate-400 font-normal normal-case">(last 7 days)</span>)}</FieldLabel>
             {/* Date window by role: shop floor = today + last 2 days; Manager =
-                last 7 days PLUS the May-2026 backfill window (the gap between is
-                locked by managerDateOk on save); Owner = no limit. The date
-                input's min only opens May up to the picker — managerDateOk is
-                the real guard. Anything before PLATING_SYNC_FROM (all of May)
-                never pushes to Plating, so May entries stay local. */}
+                last 7 days (managerDateOk is the real guard on save); Owner = back
+                to the freeze cutoff only. NOTHING before FREEZE_BEFORE (=1 June,
+                the verified history & the Plating sync cutoff) can be entered. */}
             <input type="date" value={date} onChange={e => setDate(e.target.value)}
-              min={floor ? daysAgoStr(2) : (by === 'Owner' ? undefined : MANAGER_BACKDATE_FROM)}
+              min={floor ? daysAgoStr(2) : (by === 'Owner' ? FREEZE_BEFORE : daysAgoStr(7))}
               max={by === 'Owner' ? undefined : todayStr()}
               className="mt-1 w-full border-2 border-slate-300 rounded-2xl px-3 py-2.5 text-base font-semibold focus:outline-none focus:ring-4 focus:ring-amber-200 focus:border-amber-500" />
+            {frozen && (
+              <div className="mt-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-sm text-red-700 font-semibold">
+                🔒 Locked — dates before {FREEZE_BEFORE} are the verified history. Pick 1 June 2026 or later.
+              </div>
+            )}
           </div>
         </div>
       </Card>
@@ -263,6 +279,41 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
           </div>
         )}
       </Card>
+
+      {/* Your last 15 days — read-only review so the welder can check their own
+          entries and ask the owner about anything that looks wrong. */}
+      {welder && last15ByDate.length > 0 && (
+        <Card className="p-5">
+          <div className="flex items-center justify-between mb-1">
+            <FieldLabel>📅 Your last 15 days · {welder}</FieldLabel>
+            <span className="text-sm font-bold text-slate-400">
+              {fmtNum(last15ByDate.reduce((s, [, ds]) => s + ds.reduce((t, d) => t + (Number(d.qty) || 0), 0), 0))} pcs
+            </span>
+          </div>
+          <p className="text-xs text-slate-400 mb-3">Check your entries. If anything looks wrong, tell the owner.</p>
+          <div className="space-y-3">
+            {last15ByDate.map(([d, ds]) => (
+              <div key={d}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-bold text-slate-500">{fmtDate(d)}</span>
+                  <span className="text-xs font-semibold text-slate-400">{fmtNum(ds.reduce((s, x) => s + (Number(x.qty) || 0), 0))} pcs</span>
+                </div>
+                <div className="space-y-1">
+                  {ds.map(x => (
+                    <div key={x.id} className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-slate-700 truncate">{x.finishedName || x.productName}</div>
+                        <div className="text-[11px] text-slate-400 truncate">→ {x.party}{x.welderChallan ? ` · ${x.welderChallan}` : ''}{x.gaadi ? ` · …${last4(x.gaadi)}` : ''}</div>
+                      </div>
+                      <span className="font-mono font-bold text-amber-700 flex-shrink-0">× {fmtNum(x.qty)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {fixing && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-5" onClick={() => setFixing(null)}>

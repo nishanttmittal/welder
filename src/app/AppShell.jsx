@@ -109,24 +109,21 @@ export default function AppShell({ moduleId }) {
     }
   }
 
-  const staffLock = !wantsExit && (
-    (params && (params.has('welder') || params.has('floor'))) ||
-    (typeof localStorage !== 'undefined' && localStorage.getItem(STAFF_KEY) === '1')
-  )
   const who = (params && params.get('who')) ||
     (typeof localStorage !== 'undefined' ? localStorage.getItem(WHO_KEY) : '') || ''
 
-  if (staffLock) return <Provider><StaffView module={module} operator={who} /></Provider>
-
-  // CLOUD MODE: real authentication — Google sign-in + role from the users list.
-  // Welders never reach here (they use the staff link above).
+  // CLOUD MODE: real authentication for EVERYONE (welders included — the old
+  // anonymous ?welder=1 entry is removed; it was the data leak). Role decides the
+  // view: staff → entry-only StaffView; manager/owner → full Console.
   if (isFirebaseConfigured) {
     return (
       <Provider>
         <AuthGate title={module.title} icon={module.icon}>
-          {({ role, email, signOut }) => (
-            <Console module={module} level={role === 'owner' ? 'owner' : 'incharge'} onSwitch={signOut} userEmail={email} />
-          )}
+          {({ role, email, name, signOut }) =>
+            role === 'staff'
+              ? <StaffView module={module} operator={name || who} onSwitch={signOut} />
+              : <Console module={module} level={role === 'owner' ? 'owner' : 'incharge'} onSwitch={signOut} userEmail={email} />
+          }
         </AuthGate>
       </Provider>
     )

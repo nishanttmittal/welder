@@ -12,13 +12,23 @@ import { signInWithGoogle, signOutUser, watchAuth } from '../core/db/firebase'
 import { useWelder } from '../modules/welder/WelderContext'
 import { OWNER_EMAILS } from '../modules/welder/config'
 
-/** Resolve 'owner' | 'manager' | null for an email against the users list. */
+/** Resolve 'owner' | 'manager' | 'staff' | null for an email against the users list.
+ *  staff = floor welder: entry only (Material Sent), no pay/ledger access. */
 export function resolveRole(email, users) {
   if (!email) return null
   const e = email.toLowerCase()
   if (OWNER_EMAILS.map(x => x.toLowerCase()).includes(e)) return 'owner'
   const u = (users || []).find(u => (u.email || '').toLowerCase() === e && u.active !== false)
-  return u ? (u.role === 'owner' ? 'owner' : 'manager') : null
+  if (!u) return null
+  if (u.role === 'owner') return 'owner'
+  if (u.role === 'staff' || u.role === 'employee' || u.role === 'welder') return 'staff'
+  return 'manager'
+}
+
+/** Display name for the signed-in user (floor attribution). */
+export function resolveName(email, users) {
+  const u = (users || []).find(u => (u.email || '').toLowerCase() === (email || '').toLowerCase())
+  return (u && u.name) || (email ? email.split('@')[0] : '')
 }
 
 function Screen({ children }) {
@@ -50,7 +60,7 @@ export default function AuthGate({ title = 'UNICO', icon = '🔧', children }) {
   }
 
   // Signed in with Google AND has a role → render the console.
-  if (email && role) return children({ role, email, signOut: doSignOut })
+  if (email && role) return children({ role, email, name: resolveName(email, users.list), signOut: doSignOut })
 
   // Signed in with Google but NOT authorised.
   if (email && !role) {
@@ -69,13 +79,12 @@ export default function AuthGate({ title = 'UNICO', icon = '🔧', children }) {
     <Screen>
       <div className="text-5xl mb-3">{icon}</div>
       <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
-      <p className="text-slate-400 text-sm mt-1 mb-8">Manager / Owner sign-in</p>
+      <p className="text-slate-400 text-sm mt-1 mb-8">Sign in to continue</p>
       <button onClick={doSignIn} disabled={busy}
         className="w-full max-w-xs bg-white text-slate-800 rounded-2xl px-6 py-4 font-bold shadow-xl active:scale-95 transition-transform disabled:opacity-60 flex items-center justify-center gap-3">
         <span className="text-lg">🟦</span>{busy ? 'Opening…' : 'Sign in with Google'}
       </button>
       {err && <p className="text-red-300 text-xs mt-4 max-w-xs">{err}</p>}
-      <p className="text-slate-500 text-xs mt-8 max-w-xs">Welders use their own dispatch link and don’t sign in here.</p>
     </Screen>
   )
 }

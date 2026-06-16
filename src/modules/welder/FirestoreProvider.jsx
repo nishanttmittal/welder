@@ -5,7 +5,7 @@
  */
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { onSnapshot, setDoc, deleteDoc, getDocs, writeBatch } from 'firebase/firestore'
-import { db, paths, ensureSignedIn } from '../../core/db/firebase'
+import { db, paths, ensureSignedIn, watchAuth } from '../../core/db/firebase'
 import { makeNormalizer } from '../../core/schema/field'
 import { makeId } from '../../core/db/repository'
 import { dispatchSchema, productSchema, welderSchema, partySchema, platingOutboxSchema, rateSchema, paymentSchema, ledgerSchema, settlementSchema, userSchema, componentSchema, receiptSchema, adjustmentSchema } from './schema'
@@ -13,12 +13,19 @@ import { DEFAULT_PRODUCTS, DEFAULT_WELDERS, DEFAULT_PARTIES } from './config'
 import { lastUsedStore, countersStore } from './data'
 import { WelderCtx } from './WelderContext'
 
-function useCloudCollection(collPath, docPath, normalize) {
+// authKey re-subscribes the listener when the signed-in user changes (anon →
+// Google). Also tolerates permission-denied: staff are blocked from pay
+// collections (rates/payments/ledger/settlements), which simply stay empty.
+function useCloudCollection(collPath, docPath, normalize, authKey) {
   const [list, setList] = useState([])
   useEffect(() => {
-    const unsub = onSnapshot(collPath(), (snap) => setList(snap.docs.map(d => normalize({ id: d.id, ...d.data() }))))
+    const unsub = onSnapshot(
+      collPath(),
+      (snap) => setList(snap.docs.map(d => normalize({ id: d.id, ...d.data() }))),
+      () => setList([])
+    )
     return unsub
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [authKey]) // eslint-disable-line react-hooks/exhaustive-deps
   return {
     list,
     insert: (rec) => { const id = rec.id || makeId('r'); const now = new Date().toISOString(); const row = { createdAt: now, updatedAt: now, ...rec, id }; setDoc(docPath(id), row); return row },
@@ -51,26 +58,31 @@ export function FirestoreProvider({ children }) {
   const [ready, setReady] = useState(false)
   const [timedOut, setTimedOut] = useState(false)
   const [error, setError] = useState('')
+  // changes anon -> Google so data listeners re-subscribe after login
+  const [authKey, setAuthKey] = useState('anon')
+  useEffect(() => watchAuth((u) => setAuthKey(u ? `${u.uid}:${u.email || ''}` : 'none')), [])
 
-  const dispatches = useCloudCollection(paths.dispatches, paths.dispatch, normDispatch)
-  const products   = useCloudCollection(paths.products, paths.product, normProduct)
-  const welders    = useCloudCollection(paths.welders, paths.welder, normWelder)
-  const parties    = useCloudCollection(paths.parties, paths.party, normParty)
-  const platingOutbox = useCloudCollection(paths.platingOutbox, paths.platingOutboxDoc, normOutbox)
-  const rates      = useCloudCollection(paths.rates, paths.rate, normRate)
-  const payments   = useCloudCollection(paths.payments, paths.payment, normPayment)
-  const ledger     = useCloudCollection(paths.ledger, paths.ledgerDoc, normLedger)
-  const settlements = useCloudCollection(paths.settlements, paths.settlementDoc, normSettlement)
-  const users      = useCloudCollection(paths.users, paths.user, normUser)
-  const components = useCloudCollection(paths.components, paths.component, normComponent)
-  const receipts   = useCloudCollection(paths.receipts, paths.receipt, normReceipt)
-  const adjustments = useCloudCollection(paths.adjustments, paths.adjustment, normAdjustment)
-  const logs       = useCloudCollection(paths.logs, paths.logDoc, (r) => r)
+  const dispatches = useCloudCollection(paths.dispatches, paths.dispatch, normDispatch, authKey)
+  const products   = useCloudCollection(paths.products, paths.product, normProduct, authKey)
+  const welders    = useCloudCollection(paths.welders, paths.welder, normWelder, authKey)
+  const parties    = useCloudCollection(paths.parties, paths.party, normParty, authKey)
+  const platingOutbox = useCloudCollection(paths.platingOutbox, paths.platingOutboxDoc, normOutbox, authKey)
+  const rates      = useCloudCollection(paths.rates, paths.rate, normRate, authKey)
+  const payments   = useCloudCollection(paths.payments, paths.payment, normPayment, authKey)
+  const ledger     = useCloudCollection(paths.ledger, paths.ledgerDoc, normLedger, authKey)
+  const settlements = useCloudCollection(paths.settlements, paths.settlementDoc, normSettlement, authKey)
+  const users      = useCloudCollection(paths.users, paths.user, normUser, authKey)
+  const components = useCloudCollection(paths.components, paths.component, normComponent, authKey)
+  const receipts   = useCloudCollection(paths.receipts, paths.receipt, normReceipt, authKey)
+  const adjustments = useCloudCollection(paths.adjustments, paths.adjustment, normAdjustment, authKey)
+  const logs       = useCloudCollection(paths.logs, paths.logDoc, (r) => r, authKey)
 
   useEffect(() => {
     let done = false
     const timer = setTimeout(() => { if (!done) setTimedOut(true) }, 12000)
-    const unsub = onSnapshot(paths.products(),
+    // probe users (readable by any signed-in device, incl. anonymous) so
+    // readiness resolves before Google sign-in — data collections are now locked.
+    const unsub = onSnapshot(paths.users(),
       () => { done = true; clearTimeout(timer); setReady(true) },
       (e) => { done = true; clearTimeout(timer); setError(e.message); setReady(true) })
     ensureSignedIn().catch((e) => { done = true; clearTimeout(timer); setError(e.message); setTimedOut(true) })
@@ -85,12 +97,15 @@ export function FirestoreProvider({ children }) {
   // First-run seeding (idempotent ids).
   const seededRef = useRef(false)
   useEffect(() => {
-    if (!ready || seededRef.current) return
+    // only seed once a real (allowlisted) user is signed in — writes are denied
+    // for anonymous devices under the locked rules.
+    const realUser = authKey !== 'anon' && authKey !== 'none'
+    if (!ready || !realUser || seededRef.current) return
     seededRef.current = true
     if (products.list.length === 0) DEFAULT_PRODUCTS.forEach((name, i) => setDoc(paths.product(`seed_p${i + 1}`), { id: `seed_p${i + 1}`, name, order: i }))
     if (welders.list.length === 0) DEFAULT_WELDERS.forEach((name, i) => setDoc(paths.welder(`seed_w${i + 1}`), { id: `seed_w${i + 1}`, name, order: i }))
     if (parties.list.length === 0) DEFAULT_PARTIES.forEach((name, i) => setDoc(paths.party(`seed_pt${i + 1}`), { id: `seed_pt${i + 1}`, name, order: i }))
-  }, [ready]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ready, authKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!ready && timedOut) {
     return (

@@ -247,13 +247,13 @@ function ManageUsers() {
     <Card className="p-5 space-y-3">
       <Toast msg={msg} />
       <FieldLabel>Users &amp; Access ({users.list.length})</FieldLabel>
-      <p className="text-xs text-slate-400 -mt-1">Managers/Owners sign in with Google. Add their Google email and role. Welders don’t need accounts.</p>
+      <p className="text-xs text-slate-400 -mt-1">Everyone signs in with Google. Add their Google email and role. Staff = floor welder, entry only (Material Sent), no pay/ledger access.</p>
       {OWNER_EMAILS.length > 0 && <p className="text-[11px] text-emerald-600">Built-in owner (always allowed): {OWNER_EMAILS.join(', ')}</p>}
       <div className="space-y-2">
         <TextInput placeholder="email@gmail.com" value={email} onChange={e => setEmail(e.target.value)} />
         <div className="flex gap-2">
           <TextInput placeholder="Name (optional)" value={name} onChange={e => setName(e.target.value)} />
-          <Select value={role} onChange={e => setRole(e.target.value)} options={[{ value: 'manager', label: 'Manager' }, { value: 'owner', label: 'Owner' }]} />
+          <Select value={role} onChange={e => setRole(e.target.value)} options={[{ value: 'staff', label: 'Staff (entry only)' }, { value: 'manager', label: 'Manager' }, { value: 'owner', label: 'Owner' }]} />
           <Button variant="primary" onClick={add}>Add</Button>
         </div>
       </div>
@@ -265,7 +265,7 @@ function ManageUsers() {
               <div className={`text-sm font-semibold truncate ${u.active === false ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{u.name || u.email}</div>
               <div className="text-[11px] text-slate-400 truncate">{u.email}</div>
             </div>
-            <Select className="!py-1.5 text-xs" value={u.role || 'manager'} onChange={e => setRoleFor(u, e.target.value)} options={[{ value: 'manager', label: 'Manager' }, { value: 'owner', label: 'Owner' }]} />
+            <Select className="!py-1.5 text-xs" value={u.role || 'manager'} onChange={e => setRoleFor(u, e.target.value)} options={[{ value: 'staff', label: 'Staff' }, { value: 'manager', label: 'Manager' }, { value: 'owner', label: 'Owner' }]} />
             <button onClick={() => toggleActive(u)} className={`text-xs font-bold px-2 py-1 rounded-lg ${u.active === false ? 'bg-slate-200 text-slate-500' : 'bg-emerald-100 text-emerald-700'}`}>{u.active === false ? 'Off' : 'On'}</button>
             <button onClick={() => remove(u)} className="text-red-500 font-bold px-1">✕</button>
           </div>

@@ -116,7 +116,7 @@ export const DEFAULT_PARTIES = ['Sriram', 'Jitender', 'Powder Coating Dept', 'JP
  * be added later in admin.
  */
 export const DEFAULT_PRODUCTS = [
-  'Spider', 'Beeta', 'Pune', 'Stool', 'Fan', 'Air', 'Wave',
+  'Spider', 'Beeta', 'Pune', 'Stool base', 'Fan', 'Air', 'Wave',
   'Spider 20"', 'Frame Nickel 1.5"', 'Frame Reduce 1.5" Nickel',
   'Vista', 'Mona', '1" Frame', '1.25" Frame', 'Burfi',
 ]
@@ -132,13 +132,14 @@ export const isPlatingFinish = (key) => PLATING_FINISHES.includes(key)
  *  (e.g. the manager's May backfill below) never reach the Plating app. */
 export const PLATING_SYNC_FROM = '2026-06-01'
 
-/** Manager (in-charge) date window: normally the last 7 days, PLUS a one-off
- *  May-2026 backfill window [FROM..TO] so they can enter May entries. Dates
- *  between the two (e.g. early June older than 7 days) stay locked. Owner is
- *  unbounded. Because this whole window sits before PLATING_SYNC_FROM, May
- *  entries never push to the Plating app — they stay local to the welder app. */
-export const MANAGER_BACKDATE_FROM = '2026-05-01'
-export const MANAGER_BACKDATE_TO = '2026-05-31'
+/**
+ * HISTORY FREEZE — everything before this date is the verified pre-June baseline
+ * (the May backfill is done). NO ONE — floor, manager, or owner — may create or
+ * back-date a dispatch before this. Mirrors the Plating app's FREEZE_BEFORE and
+ * lines up with PLATING_SYNC_FROM. (The temporary May-2026 manager backfill
+ * window was closed on 2026-06-15 — that's why the old MANAGER_BACKDATE_* are gone.)
+ */
+export const FREEZE_BEFORE = '2026-06-01'
 
 /** Welder challan prefix from the welder's name, e.g. "Naveen" → "NAV". */
 export const welderPrefix = (name) => ((name || '').replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase() || 'WLD')
