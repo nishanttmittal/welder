@@ -8,7 +8,7 @@ import { Button, Card, FieldLabel, NumberInput, Select, DateInput, useToast, Toa
 import { todayStr, fmtDate } from '../../../core/utils/format'
 import { useWelder } from '../WelderContext'
 import { rateOn, currentOpenRate, dayBefore, rateTimeline, isRateActiveNow } from '../logic/pay'
-import { PROCESSES, processLabel, ADMIN_PASSWORD } from '../config'
+import { PROCESSES, processLabel } from '../config'
 
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100
 const rate$ = (n) => '₹' + round2(n).toLocaleString('en-IN', { maximumFractionDigits: 2 })
@@ -24,9 +24,7 @@ export default function Rates({ by = 'owner' }) {
   const [unlocked, setUnlocked] = useState(false)   // rates are LOCKED by default — unlock to edit
 
   const unlock = () => {
-    const pwd = prompt('Rates are locked.\nEnter admin password to unlock and edit:')
-    if (pwd === null) return
-    if (pwd !== ADMIN_PASSWORD) return show('Wrong password — still locked', 2500)
+    if (!confirm('Unlock the rates so you can edit them?')) return
     setUnlocked(true); show('Rates unlocked — you can edit now')
   }
 

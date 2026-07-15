@@ -11,7 +11,7 @@ import { useMemo, useState } from 'react'
 import { Button, Card, FieldLabel, NumberInput, Select, TextInput, DateInput, useToast, Toast } from '../../../core/ui'
 import { todayStr, fmtNum, fmtDate } from '../../../core/utils/format'
 import { useWelder } from '../WelderContext'
-import { PAYMENT_MODES, ADMIN_PASSWORD } from '../config'
+import { PAYMENT_MODES } from '../config'
 import { buildLedger, nextPaymentSlip, newPayment, lockedOn } from '../logic/pay'
 
 const money = (n) => '₹' + fmtNum(Math.round(Number(n) || 0))
@@ -53,9 +53,7 @@ export default function Advances({ owner = false, by = 'owner' }) {
   const lockGuard = (r) => {
     const s = lockedOn(settlements?.list, r.contractor, r.date)
     if (!s) return true
-    const pass = prompt(`${r.contractor}'s ${s.month} hisab is finalized & locked.\nEnter admin password to change this entry:`)
-    if (pass === null) return false
-    if (pass !== ADMIN_PASSWORD) { show('Wrong password — locked', 2500); return false }
+    if (!confirm(`${r.contractor}'s ${s.month} hisab is finalized & locked.\nChange this entry anyway?`)) return false
     return true
   }
 
@@ -70,9 +68,6 @@ export default function Advances({ owner = false, by = 'owner' }) {
 
   const del = (r) => {
     if (!confirm(`Delete this ${r.source === 'payment' ? 'payment' : 'advance'} of ${money(r.amount)} for ${r.contractor}? This cannot be undone.`)) return
-    const pass = prompt('Enter admin password to permanently delete:')
-    if (pass === null) return
-    if (pass !== ADMIN_PASSWORD) return show('Wrong admin password — not deleted', 2500)
     coll(r.source).remove(r.id)
     log('ADV_DELETE', `${r.slip || r.source} ${money(r.amount)} · ${r.contractor} deleted (${role})`, by)
     show('Deleted ✓')

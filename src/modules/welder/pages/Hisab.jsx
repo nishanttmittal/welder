@@ -14,7 +14,7 @@ import { Button, Card, FieldLabel, NumberInput, Select, TextInput, DateInput, us
 import { todayStr, fmtNum, fmtDate } from '../../../core/utils/format'
 import { useWelder } from '../WelderContext'
 import { computeHisab, lockedOn, nextPaymentSlip, newPayment, paidByLabel } from '../logic/pay'
-import { ADMIN_PASSWORD, PAYMENT_MODES } from '../config'
+import { PAYMENT_MODES } from '../config'
 
 const num = (v) => Number(v) || 0
 const money = (n) => '₹' + fmtNum(Math.round(num(n)))
@@ -46,9 +46,7 @@ export default function Hisab({ owner = false, by = 'admin' }) {
   const lockGuard = (date) => {
     const s = lockedOn(settlements?.list, welder, date)
     if (!s) return true
-    const pwd = prompt(`${welder}'s ${s.month} hisab is finalized & locked (up to ${s.cutoffDate}).\nAdmin password to change:`)
-    if (pwd === null) return false
-    if (pwd !== ADMIN_PASSWORD) { show('Wrong password — locked', 2500); return false }
+    if (!confirm(`${welder}'s ${s.month} hisab is finalized & locked (up to ${s.cutoffDate}).\nChange this entry anyway?`)) return false
     return true
   }
   const addAdvance = ({ amount, date, note }) => {
@@ -117,9 +115,7 @@ export default function Hisab({ owner = false, by = 'admin' }) {
     show('Hisab finalized & locked ✓'); setFinalizing(false); exportPDF()
   }
   const reopen = () => {
-    const pwd = prompt(`Reopen ${welder}'s ${month} hisab?\nAdmin password:`)
-    if (pwd === null) return
-    if (pwd !== ADMIN_PASSWORD) return show('Wrong password', 2500)
+    if (!confirm(`Reopen ${welder}'s ${month} hisab for editing?`)) return
     settlements.update(h.settlement.id, { locked: false }); log('SETTLEMENT_REOPEN', `${welder} ${month}`, by); show('Reopened ✓')
   }
 

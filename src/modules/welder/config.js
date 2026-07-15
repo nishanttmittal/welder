@@ -27,13 +27,6 @@ export const ROLES = { owner: 'owner', manager: 'manager' }
 /** Display name for the manager/in-charge role. */
 export const INCHARGE_LABEL = 'Manager'
 
-/**
- * UNICO admin password — a second-factor speed-bump on hard-delete (the page is
- * already owner-only via Google sign-in). NOTE: a frontend password is readable
- * in the JS bundle, so this is a guard against accidental/casual deletion, not a
- * security boundary. Real protection = Auth + Firestore rules. Rotate in the
- * dedicated Security Phase when external users get access. */
-export const ADMIN_PASSWORD = '6133923_N'
 
 /** Wrong-entry correction window: Manager + Owner may correct an entry within
  *  this many hours of creation; after that, corrections are Owner-only.

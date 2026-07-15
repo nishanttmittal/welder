@@ -13,7 +13,7 @@ import { Button, Card, FieldLabel, SearchBar, Select, NumberInput, DateInput, Te
 import { fmtDate, fmtNum } from '../../../core/utils/format'
 import { useWelder } from '../WelderContext'
 import { lockedOn } from '../logic/pay'
-import { FINISHES, finishedName, EDIT_WINDOW_HOURS, ADMIN_PASSWORD } from '../config'
+import { FINISHES, finishedName, EDIT_WINDOW_HOURS } from '../config'
 
 const within48 = (d, now) => {
   if (!d.createdAt) return true
@@ -44,9 +44,7 @@ export default function History({ owner = false, by = 'admin' }) {
   const lockGuard = (d) => {
     const s = lockedOn(settlements?.list, d.welder, d.date)
     if (!s) return true
-    const pwd = prompt(`${d.welder}'s ${s.month} hisab is FINALIZED & locked (entries up to ${s.cutoffDate}).\nEnter admin password to change this entry:`)
-    if (pwd === null) return false
-    if (pwd !== ADMIN_PASSWORD) { show('Wrong password — entry stays locked', 2500); return false }
+    if (!confirm(`${d.welder}'s ${s.month} hisab is FINALIZED & locked (entries up to ${s.cutoffDate}).\nChange this entry anyway?`)) return false
     return true
   }
 
