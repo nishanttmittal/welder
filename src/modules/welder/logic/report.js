@@ -17,19 +17,19 @@ export function pipeline(dispatches) {
 
 /** Total pieces sent in a date range. */
 export const totalSent = (dispatches, from, to) =>
-  dispatches.filter(d => inRange(d, from, to)).reduce((s, d) => s + num(d.qty), 0)
+  dispatches.filter(d => inRange(d, from, to) && d.payBasis !== 'final-dispatch').reduce((s, d) => s + num(d.qty), 0)
 
 /** Per-welder totals: [{ welder, qty }] sorted desc. */
 export function byWelder(dispatches, from, to) {
   const m = {}
-  for (const d of dispatches.filter(d => inRange(d, from, to))) m[d.welder] = (m[d.welder] || 0) + num(d.qty)
+  for (const d of dispatches.filter(d => inRange(d, from, to) && d.payBasis !== 'final-dispatch')) m[d.welder] = (m[d.welder] || 0) + num(d.qty)
   return Object.entries(m).map(([welder, qty]) => ({ welder, qty })).sort((a, b) => b.qty - a.qty)
 }
 
 /** Per-party totals: [{ party, qty }] sorted desc. */
 export function byParty(dispatches, from, to) {
   const m = {}
-  for (const d of dispatches.filter(d => inRange(d, from, to))) m[d.party || '—'] = (m[d.party || '—'] || 0) + num(d.qty)
+  for (const d of dispatches.filter(d => inRange(d, from, to) && d.payBasis !== 'final-dispatch')) m[d.party || '—'] = (m[d.party || '—'] || 0) + num(d.qty)
   return Object.entries(m).map(([party, qty]) => ({ party, qty })).sort((a, b) => b.qty - a.qty)
 }
 
@@ -39,7 +39,7 @@ export function byParty(dispatches, from, to) {
  */
 export function partyProductBreakdown(dispatches, date) {
   const out = {}
-  for (const d of dispatches.filter(d => d.date === date)) {
+  for (const d of dispatches.filter(d => d.date === date && d.payBasis !== 'final-dispatch')) {
     const party = d.party || '—'
     const name = d.finishedName || d.productName
     out[party] = out[party] || {}
@@ -56,7 +56,7 @@ export function partyProductBreakdown(dispatches, date) {
 /** Per-welder, for a date: [{ welder, total, items:[{name, party, qty}] }]. */
 export function welderBreakdown(dispatches, date) {
   const out = {}
-  for (const d of dispatches.filter(d => d.date === date)) {
+  for (const d of dispatches.filter(d => d.date === date && d.payBasis !== 'final-dispatch')) {
     out[d.welder] = out[d.welder] || []
     out[d.welder].push({ name: d.finishedName || d.productName, party: d.party || '—', qty: num(d.qty) })
   }

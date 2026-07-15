@@ -36,8 +36,9 @@ export const INCHARGE_LABEL = 'Manager'
 export const ADMIN_PASSWORD = '6133923_N'
 
 /** Wrong-entry correction window: Manager + Owner may correct an entry within
- *  this many hours of creation; after that, corrections are Owner-only. */
-export const EDIT_WINDOW_HOURS = 48
+ *  this many hours of creation; after that, corrections are Owner-only.
+ *  (Owner can always correct any entry, any age — this cap is for Manager/staff.) */
+export const EDIT_WINDOW_HOURS = 96
 
 /**
  * Entry lifecycle (approval flow): staff creates → pending; manager → passed;
@@ -140,6 +141,23 @@ export const PLATING_SYNC_FROM = '2026-06-01'
  * window was closed on 2026-06-15 — that's why the old MANAGER_BACKDATE_* are gone.)
  */
 export const FREEZE_BEFORE = '2026-06-01'
+
+/**
+ * JUNE–JULY BACKFILL WINDOW (temporary, one-shot).
+ * Some welders never entered their June/July dispatches. Anshul (Manager) fills
+ * those gaps. While open, the Manager can back-date all the way to FREEZE_BEFORE
+ * (1 June); Owner can always do so regardless. On BACKFILL_LOCK_DATE the Manager
+ * window auto-reverts to the normal last-7-days rule, re-locking June/July for
+ * staff (Owner keeps its override). Flips by calendar date — no redeploy to lock.
+ *
+ * 2026-07-13: Owner asked to KEEP entries open for himself + Anshul until the
+ * month hisab (June & July) is finalised; lock was pushed to 2026-08-15.
+ * CLOSED SAME DAY (2026-07-13): owner confirmed both months' data is updated, so
+ * the lock is set to today — the Manager reverts to the normal last-7-days rule
+ * now. Owner override intact; no data touched. To reopen a backfill later, push
+ * this date out again. Once well past, this constant + the backfill logic can be removed.
+ */
+export const BACKFILL_LOCK_DATE = '2026-07-13'
 
 /** Welder challan prefix from the welder's name, e.g. "Naveen" → "NAV". */
 export const welderPrefix = (name) => ((name || '').replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase() || 'WLD')

@@ -1,9 +1,9 @@
 /**
  * Entries — view & CORRECT dispatch entries (controlled correction flow).
  *   • Manager + Owner: correct qty / product / welder / finish / party / date
- *     within EDIT_WINDOW_HOURS (48h) of creation. A reason is MANDATORY and every
+ *     within EDIT_WINDOW_HOURS (96h) of creation. A reason is MANDATORY and every
  *     change is written to the audit log (old→new · who · when · reason).
- *   • After 48h: corrections are OWNER-ONLY (same audited flow).
+ *   • After the window: corrections are OWNER-ONLY (same audited flow).
  *   • Void = soft-reverse (qty→0, kept & logged). Owner may also hard-delete,
  *     but only with a logged reason — never silent.
  * Nothing is ever overwritten silently.
@@ -24,6 +24,7 @@ export default function History({ owner = false, by = 'admin' }) {
   const { dispatches, products, welders, parties, settlements, logs, log } = useWelder()
   const { msg, show } = useToast()
   const [q, setQ] = useState('')
+  const [dateFilter, setDateFilter] = useState('')
   const [editing, setEditing] = useState(null)
   const [historyOf, setHistoryOf] = useState(null)
   const now = Date.now()
@@ -34,9 +35,10 @@ export default function History({ owner = false, by = 'admin' }) {
   const rows = useMemo(() => {
     const term = q.trim().toLowerCase()
     return dispatches.list
-      .filter(d => !term || (d.finishedName || d.productName || '').toLowerCase().includes(term) || (d.welder || '').toLowerCase().includes(term) || (d.party || '').toLowerCase().includes(term) || (d.date || '').includes(term))
+      .filter(d => !term || (d.finishedName || d.productName || '').toLowerCase().includes(term) || (d.welder || '').toLowerCase().includes(term) || (d.party || '').toLowerCase().includes(term) || (d.date || '').includes(term) || fmtDate(d.date).includes(term))
+      .filter(d => !dateFilter || d.date === dateFilter)
       .sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || '').localeCompare(a.createdAt || ''))
-  }, [dispatches.list, q])
+  }, [dispatches.list, q, dateFilter])
 
   // If this entry sits in a finalized (locked) hisab, require the admin password.
   const lockGuard = (d) => {
@@ -78,6 +80,12 @@ export default function History({ owner = false, by = 'admin' }) {
     <div className="max-w-lg mx-auto p-4 space-y-4">
       <Toast msg={msg} />
       <SearchBar value={q} onChange={setQ} placeholder="Search product / welder / party / date…" />
+      <div className="flex items-center gap-2 flex-wrap -mt-1">
+        <span className="text-xs font-semibold text-slate-500">📅 By date</span>
+        <DateInput value={dateFilter} onChange={e => setDateFilter(e.target.value)} className="w-auto" />
+        {dateFilter && <button onClick={() => setDateFilter('')} className="text-xs font-semibold text-amber-600 underline">clear</button>}
+        <span className="text-xs text-slate-400 ml-auto">{rows.length} entr{rows.length === 1 ? 'y' : 'ies'}</span>
+      </div>
       {!owner && <p className="text-xs text-slate-400 -mt-1">You can correct entries within {EDIT_WINDOW_HOURS} hours. Older entries are owner-only.</p>}
       {rows.length === 0 ? (
         <Card className="p-8 text-center text-slate-400">No entries found.</Card>
@@ -91,8 +99,11 @@ export default function History({ owner = false, by = 'admin' }) {
               <Card key={d.id} className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className={`font-bold ${voided ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{d.finishedName || d.productName}</div>
-                    <div className="text-xs text-slate-400 mt-0.5">{fmtDate(d.date)} · {d.welder} → {d.party}{d.welderChallan ? ` · ${d.welderChallan}` : ''}</div>
+                    <div className={`font-bold ${voided ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+                      {d.finishedName || d.productName}
+                      {d.payBasis === 'final-dispatch' && <span className="ml-1.5 text-[10px] font-bold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded align-middle">FINAL DISPATCH PAY</span>}
+                    </div>
+                    <div className="text-xs text-slate-400 mt-0.5">{fmtDate(d.date)} · {d.welder}{d.payBasis === 'final-dispatch' ? '' : ` → ${d.party}`}{d.welderChallan ? ` · ${d.welderChallan}` : ''}</div>
                   </div>
                   <span className={`font-mono font-bold text-lg ${voided ? 'text-slate-400' : 'text-amber-700'}`}>{voided ? 'void' : `× ${fmtNum(d.qty)}`}</span>
                 </div>

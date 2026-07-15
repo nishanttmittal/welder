@@ -34,7 +34,7 @@ export default function Dashboard() {
     const map = {}
     for (const d of list) {
       const q = Number(d.qty) || 0
-      if (q <= 0 || d.date < monthFrom || d.date > date) continue
+      if (q <= 0 || d.date < monthFrom || d.date > date || d.payBasis === 'final-dispatch') continue
       const m = (map[d.productName] = map[d.productName] || { name: d.productName, day: 0, month: 0 })
       if (d.date === date) m.day += q
       m.month += q

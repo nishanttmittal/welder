@@ -25,6 +25,7 @@ function ResyncPlating() {
       const noPlating = new Set(products.list.filter(p => p.noPlating).map(p => p.name))
       const byCode = {}
       dispatches.list.forEach(d => {
+        if (d.payBasis === 'final-dispatch') return // owner pay entry — never goes to plating
         if (!isPlatingFinish(d.finish) || !d.welderChallan || Number(d.qty) <= 0 || (d.date || '') < PLATING_SYNC_FROM) return
         if (noPlating.has(d.productName)) return
         ;(byCode[d.welderChallan] ||= []).push(d)
@@ -299,6 +300,8 @@ function ManageProducts() {
   const setOwnerFor = (p, w) => { products.update(p.id, { welder: w }); log('PRODUCT_OWNER', `${p.name} → ${w || 'Common'}`, 'owner') }
   const togglePlating = (p) => { const np = !p.noPlating; products.update(p.id, { noPlating: np }); log('PRODUCT_PLATING', `${p.name} ${np ? 'no-plating' : 'for plating'}`, 'owner') }
   const toggleReference = (p) => { const ref = !p.referenceOnly; products.update(p.id, { referenceOnly: ref }); log('PRODUCT_REFERENCE', `${p.name} ${ref ? 'material/reference (not paid)' : 'payable in hisab'}`, 'owner') }
+  const toggleFinalDispatch = (p) => { const fd = !p.finalDispatchOnly; products.update(p.id, { finalDispatchOnly: fd }); log('PRODUCT_FINALDISPATCH', `${p.name} ${fd ? 'owner-only (final dispatch)' : 'normal entry'}`, 'owner') }
+  const setCodeFor = (p) => { const c = prompt(`Code number for "${p.name}":`, p.code || ''); if (c === null) return; products.update(p.id, { code: c.trim() }); log('PRODUCT_CODE', `${p.name} code → ${c.trim() || '(cleared)'}`, 'owner') }
   const startEdit = (p) => { setEditId(p.id); setEditName(p.name) }
   const saveEdit = (p) => {
     const newName = editName.trim()
@@ -357,6 +360,8 @@ function ManageProducts() {
                   <Select className="!py-1 !w-32 text-xs" value={p.welder || ''} onChange={e => setOwnerFor(p, e.target.value)} options={ownerOpts} />
                   <button onClick={() => togglePlating(p)} title="For plating?" className={`text-[11px] font-bold px-2 py-1 rounded-lg flex-shrink-0 ${p.noPlating ? 'bg-slate-200 text-slate-500' : 'bg-blue-100 text-blue-700'}`}>{p.noPlating ? 'No plating' : 'For plating'}</button>
                   <button onClick={() => toggleReference(p)} title="Material / reference — not paid in hisab" className={`text-[11px] font-bold px-2 py-1 rounded-lg flex-shrink-0 ${p.referenceOnly ? 'bg-amber-200 text-amber-800' : 'bg-emerald-100 text-emerald-700'}`}>{p.referenceOnly ? '📦 Material' : '💰 Paid'}</button>
+                  <button onClick={() => toggleFinalDispatch(p)} title="Owner-only: paid via Add-to-Hisab (Final Dispatch); hidden from normal entry" className={`text-[11px] font-bold px-2 py-1 rounded-lg flex-shrink-0 ${p.finalDispatchOnly ? 'bg-purple-200 text-purple-800' : 'bg-slate-100 text-slate-400'}`}>{p.finalDispatchOnly ? '🎯 Final-dispatch' : 'Normal entry'}</button>
+                  <button onClick={() => setCodeFor(p)} title="Set the product code number" className="text-[11px] font-bold px-2 py-1 rounded-lg flex-shrink-0 bg-slate-100 text-slate-600">{p.code ? `#${p.code}` : '# code'}</button>
                 </div>
               </div>
             )}

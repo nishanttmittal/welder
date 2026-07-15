@@ -42,6 +42,11 @@ export const dispatchSchema = [
   field({ name: 'createdByRole',       label: 'Created By Role',      default: '',        inList: false }), // welder | incharge | owner
   field({ name: 'updatedAt',           label: 'Updated At',           default: '',        inList: false }), // ISO timestamp, auto-stamped on every write
   field({ name: 'factoryId',           label: 'Factory ID',           default: 'main',    inList: false }), // multi-factory ready
+  // payBasis: '' = normal welding dispatch. 'final-dispatch' = an OWNER-ONLY pay
+  // entry booked on the FINISHED item's dispatched qty (post coating/fitting/pack).
+  // INCLUDED in hisab/ledger (money) but EXCLUDED from physical production reports
+  // (dashboard piece counts, daily/pivot PDFs, stock consumption). Never syncs to plating.
+  field({ name: 'payBasis',            label: 'Pay Basis',            default: '',        inList: false }),
 ]
 
 /**
@@ -77,6 +82,13 @@ export const productSchema = [
   // referenceOnly: material/component product paid via the material/dispatch flow,
   // NOT by welder piece-rate. Kept for reference/comparison; excluded from hisab.
   field({ name: 'referenceOnly', label: 'Material / reference (not paid)', type: 'toggle', default: false }),
+  // code: the product's code number (owner reference; maps to the shared product
+  // master `sku` when that lands). Plain display field, no logic attached.
+  field({ name: 'code',      label: 'Code',            type: 'text',   default: '' }),
+  // finalDispatchOnly: this FINISHED item is paid ONLY at final dispatch, entered
+  // via the owner-only "Add to Hisab (Final Dispatch)" screen. Hidden from the
+  // normal Material-Sent entry so it can never be double-paid at the weld stage.
+  field({ name: 'finalDispatchOnly', label: 'Owner-only (final dispatch)', type: 'toggle', default: false }),
   // recipe: [{ componentId, qty }] — raw materials per ONE finished piece.
   field({ name: 'recipe',    label: 'Recipe',          type: 'list',   default: () => [] }),
 ]

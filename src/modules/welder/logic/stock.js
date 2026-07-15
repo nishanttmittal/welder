@@ -55,6 +55,7 @@ export function computeStock(components, receipts, dispatches, products, adjustm
   for (const p of products) prodByName[p.name] = p
   for (const d of dispatches) {
     if (!(num(d.qty) > 0)) continue
+    if (d.payBasis === 'final-dispatch') continue // owner pay entry, not a real weld — no raw-material consumption
     const p = prodByName[d.productName]
     if (!p) continue
     for (const r of recipeOf(p)) {
@@ -94,6 +95,7 @@ export function stockTransactions(components, receipts, dispatches, products, ad
   }
   for (const d of dispatches) {
     if (!(num(d.qty) > 0)) continue
+    if (d.payBasis === 'final-dispatch') continue // owner pay entry, not a real weld — no raw-material consumption
     const p = prodByName[d.productName]; if (!p) continue
     for (const r of recipeOf(p)) {
       const c = compById[r.componentId]; if (!c) continue

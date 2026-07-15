@@ -9,7 +9,7 @@ import { useMemo, useState, useEffect, useRef } from 'react'
 import { Button, Card, FieldLabel, Select, NumberInput, TextInput, useToast, Toast } from '../../../core/ui'
 import { todayStr, daysAgoStr, fmtNum, fmtDate } from '../../../core/utils/format'
 import { useWelder } from '../WelderContext'
-import { FINISHES, finishedName, isPlatingFinish, SOURCE_APP, WORKFLOW_STAGE, DEFAULT_FACTORY_ID, PLATING_SYNC_FROM, FREEZE_BEFORE } from '../config'
+import { FINISHES, finishedName, isPlatingFinish, SOURCE_APP, WORKFLOW_STAGE, DEFAULT_FACTORY_ID, PLATING_SYNC_FROM, FREEZE_BEFORE, BACKFILL_LOCK_DATE } from '../config'
 import { nextWelderChallan, last4 } from '../logic/platingBridge'
 import { computeStock, recipeOf } from '../logic/stock'
 import { makeId } from '../../../core/db/repository'
@@ -37,9 +37,12 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
   const who = by || operator || (floor ? 'welder' : 'admin')
   // Per-welder product list: common products (welder='') + this welder's own
   // products (e.g. Jitender's mechanism parts). Naveen never sees Jitender's.
+  // finalDispatchOnly items are paid only via the owner-only Final-Dispatch screen,
+  // so they are hidden here — a welder/manager can never enter them at the weld stage
+  // (that's what prevents double-pay).
   const productList = useMemo(() =>
     [...products.list]
-      .filter(p => !p.welder || p.welder === welder)
+      .filter(p => (!p.welder || p.welder === welder) && !p.finalDispatchOnly)
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name)),
     [products.list, welder])
   const prodOpts = [{ value: '', label: '— product —' }, ...productList.map(p => ({ value: p.name, label: p.name }))]
@@ -62,9 +65,17 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
     .filter(d => d.date === date && (!welder || d.welder === welder))
     .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
   const canEditDay = date >= daysAgoStr(2)
-  // Manager date rule: the last 7 days. Owner & shop floor have their own windows.
-  const managerDateOk = floor || by === 'Owner' || date >= daysAgoStr(7)
-  // History freeze: nobody (incl. owner) may create/back-date before the cutoff.
+  // June/July backfill window: until BACKFILL_LOCK_DATE, a Manager (Anshul) may
+  // back-date all the way to FREEZE_BEFORE to fill the June/July dispatches the
+  // welders never entered. On/after that date the Manager window reverts to the
+  // normal last-7-days rule — which locks June/July for staff. Owner keeps its
+  // override (can always reach FREEZE_BEFORE); shop floor is unchanged.
+  // See config.js → BACKFILL_LOCK_DATE.
+  const backfillOpen = todayStr() < BACKFILL_LOCK_DATE
+  const managerBack = backfillOpen ? FREEZE_BEFORE : daysAgoStr(7)
+  // Manager date rule. Owner & shop floor have their own windows.
+  const managerDateOk = floor || by === 'Owner' || date >= managerBack
+  // History freeze: nobody (incl. owner) may create/back-date before this. Unchanged.
   const frozen = date < FREEZE_BEFORE
 
   // This welder's own entries over the last 15 days, grouped by date (newest
@@ -185,13 +196,13 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
               : <Select className="mt-1" value={welder} onChange={e => setWelder(e.target.value)} options={welders.list.map(w => ({ value: w.name, label: w.name }))} />}
           </div>
           <div>
-            <FieldLabel>Date {floor ? <span className="text-slate-400 font-normal normal-case">(today or last 2 days)</span> : (by !== 'Owner' && <span className="text-slate-400 font-normal normal-case">(last 7 days)</span>)}</FieldLabel>
+            <FieldLabel>Date {floor ? <span className="text-slate-400 font-normal normal-case">(today or last 2 days)</span> : (by !== 'Owner' && <span className="text-slate-400 font-normal normal-case">({backfillOpen ? 'June–July backfill open' : 'last 7 days'})</span>)}</FieldLabel>
             {/* Date window by role: shop floor = today + last 2 days; Manager =
                 last 7 days (managerDateOk is the real guard on save); Owner = back
                 to the freeze cutoff only. NOTHING before FREEZE_BEFORE (=1 June,
                 the verified history & the Plating sync cutoff) can be entered. */}
             <input type="date" value={date} onChange={e => setDate(e.target.value)}
-              min={floor ? daysAgoStr(2) : (by === 'Owner' ? FREEZE_BEFORE : daysAgoStr(7))}
+              min={floor ? daysAgoStr(2) : (by === 'Owner' ? FREEZE_BEFORE : managerBack)}
               max={by === 'Owner' ? undefined : todayStr()}
               className="mt-1 w-full border-2 border-slate-300 rounded-2xl px-3 py-2.5 text-base font-semibold focus:outline-none focus:ring-4 focus:ring-amber-200 focus:border-amber-500" />
             {frozen && (

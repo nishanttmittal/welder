@@ -26,7 +26,7 @@ const GROUPS = {
  * jsPDF doc ready to share on WhatsApp.
  */
 export function buildReportPdf(dispatches, { from, to, groupBy = 'product', welder, finish, party, product }) {
-  const rows = dispatches.filter(d => Number(d.qty) > 0
+  const rows = dispatches.filter(d => Number(d.qty) > 0 && d.payBasis !== 'final-dispatch'
     && (!from || (d.date || '') >= from) && (!to || (d.date || '') <= to)
     && (!welder || d.welder === welder)
     && (!finish || d.finish === finish)
@@ -72,7 +72,7 @@ export function buildReportPdf(dispatches, { from, to, groupBy = 'product', weld
  * date-wise report. Filters: date range + welder/finish/party/product.
  */
 export function buildDateWisePivotPdf(dispatches, { from, to, welder, finish, party, product }) {
-  const rows = dispatches.filter(d => Number(d.qty) > 0
+  const rows = dispatches.filter(d => Number(d.qty) > 0 && d.payBasis !== 'final-dispatch'
     && (!from || (d.date || '') >= from) && (!to || (d.date || '') <= to)
     && (!welder || d.welder === welder)
     && (!finish || d.finish === finish)
