@@ -37,6 +37,15 @@ export default function Hisab({ owner = false, by = 'admin' }) {
   const refProducts = useMemo(() => new Set(products.list.filter(p => p.referenceOnly).map(p => p.name)), [products.list])
   const h = useMemo(() => computeHisab({ dispatches: dispatches.list, rates: rates.list, payments: payments.list, ledger: ledger.list, settlements: settlements.list, refProducts, welder, month, today: todayStr() }),
     [dispatches.list, rates.list, payments.list, ledger.list, settlements.list, refProducts, welder, month])
+  // ALL-welders month total (same computeHisab per welder, so it always agrees with each tab):
+  // "given" = advances + payments in that month's open window — total money OUT to contractors.
+  const [showAll, setShowAll] = useState(false)
+  const allH = useMemo(() => welders.list.map(w => ({ name: w.name,
+    h: computeHisab({ dispatches: dispatches.list, rates: rates.list, payments: payments.list, ledger: ledger.list, settlements: settlements.list, refProducts, welder: w.name, month, today: todayStr() }) })),
+    [welders.list, dispatches.list, rates.list, payments.list, ledger.list, settlements.list, refProducts, month])
+  const totAdv = allH.reduce((s, x) => s + x.h.advTotal, 0)
+  const totPay = allH.reduce((s, x) => s + x.h.payTotal, 0)
+  const totEarned = allH.reduce((s, x) => s + x.h.earned, 0)
 
   const refPcs = refProducts.size
     ? dispatches.list.filter(d => d.welder === welder && num(d.qty) > 0 && refProducts.has(d.productName) && d.date >= `${month}-01` && d.date <= `${month}-31`).reduce((s, d) => s + num(d.qty), 0)
@@ -134,6 +143,25 @@ export default function Hisab({ owner = false, by = 'admin' }) {
         <div className="text-center"><div className="font-bold text-slate-800">{monthLabel(month)}</div>{h.locked && <div className="text-[11px] text-rose-600 font-bold">🔒 finalized · locked ≤ {fmtDate(h.advUpper)}</div>}</div>
         <button onClick={() => setMonth(shiftMonth(month, 1))} disabled={isCurrentMonth} className={`w-12 h-12 rounded-xl text-2xl font-bold ${isCurrentMonth ? 'bg-slate-50 text-slate-300' : 'bg-slate-100 active:bg-slate-200'}`}>▶</button>
       </div>
+
+      {/* ALL welders — total money given this month (tap to see per-welder split) */}
+      <button onClick={() => setShowAll(s => !s)} className="w-full text-left bg-white rounded-2xl border-2 border-slate-200 p-3 active:bg-slate-50">
+        <div className="flex justify-between items-baseline">
+          <span className="text-sm font-bold text-slate-700">💸 All welders — given this month</span>
+          <span className="font-extrabold text-slate-900">{money(totAdv + totPay)}</span>
+        </div>
+        <div className="text-[11px] text-slate-500 mt-0.5">advances {money(totAdv)} + payments {money(totPay)} · work earned {money(totEarned)} <span className="float-right">{showAll ? '▲' : '▼'}</span></div>
+        {showAll && (
+          <div className="mt-2 pt-2 border-t border-slate-100 space-y-1">
+            {allH.map(x => (
+              <div key={x.name} className="flex justify-between items-baseline text-sm">
+                <span className="text-slate-600">👷 {x.name}{x.h.locked ? ' 🔒' : ''}</span>
+                <span className="font-mono text-slate-700">given <b>{money(x.h.advTotal + x.h.payTotal)}</b> · <span className={x.h.net >= 0 ? 'text-emerald-700' : 'text-amber-700'}>{x.h.net >= 0 ? 'payable' : 'advance'} {money(Math.abs(x.h.net))}</span></span>
+              </div>
+            ))}
+          </div>
+        )}
+      </button>
 
       <Card className={`p-5 text-center ${h.net >= 0 ? 'bg-emerald-50' : 'bg-amber-50'}`}>
         <div className="text-xs text-slate-500 font-semibold">{h.net >= 0 ? `PAYABLE to ${welder}` : `ADVANCE with ${welder}`}</div>
