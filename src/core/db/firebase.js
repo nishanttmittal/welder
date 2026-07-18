@@ -126,6 +126,15 @@ export async function signInWithGoogle() {
   if (!auth) throw new Error('Cloud not configured')
   const provider = new GoogleAuthProvider()
   provider.setCustomParameters({ prompt: 'select_account' })
+  // FIX 2026-07-19 (same class as the transport-freight 3-July outage): in an INSTALLED
+  // home-screen PWA, signInWithPopup hangs forever (window can never message back) —
+  // standalone mode must go straight to the full-page redirect.
+  const standalone = typeof window !== 'undefined' &&
+    (window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator?.standalone === true)
+  if (standalone) {
+    const { signInWithRedirect } = await import('firebase/auth')
+    return signInWithRedirect(auth, provider)
+  }
   try {
     return await signInWithPopup(auth, provider)
   } catch (e) {
