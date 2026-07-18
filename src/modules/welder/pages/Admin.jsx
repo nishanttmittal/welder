@@ -149,7 +149,8 @@ function DataTools() {
     const f = e.target.files?.[0]; if (!f) return
     try {
       const data = JSON.parse(await f.text())
-      if (!confirm('Restore will REPLACE all current data with the backup. Continue?')) return
+      // typed confirm (fix 2026-07-18): restore replaces EVERYTHING — same friction as Reset
+      if (prompt(`Restore will REPLACE all current data with "${f.name}".\nType RESTORE to continue:`) !== 'RESTORE') return show('Restore cancelled', 2000)
       const map = { dispatches, products, welders, parties, rates, payments, ledger, users, components, receipts, adjustments, platingOutbox }
       for (const [k, repo] of Object.entries(map)) { if (Array.isArray(data[k])) await repo.replaceAll(data[k]) }
       log('RESTORE', f.name, 'admin'); show('Restored ✓')

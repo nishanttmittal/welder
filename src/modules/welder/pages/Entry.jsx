@@ -168,14 +168,22 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
     // Plating app (no challan yet — they Accept it there). Plating finishes only,
     // dated on/after the cutoff. Idempotent by id (one per welder challan).
     if (plating && code && platingItems.length && date >= PLATING_SYNC_FROM) {
-      pushPlatingIncoming({
+      const feed = {
         id: `feed_${code}`, status: 'pending',
         date, party, gaadi: gaadi.trim(),
         items: platingItems.map(it => ({ product: it.product, quantity: Number(it.qty) })),
         welderChallanNo: code, linkedChallanId: code, batchId,
         sourceApp: SOURCE_APP, destinationApp: 'platingjobwork', parentTransactionId: '',
         createdAt: stamp, createdBy: who,
-      }).catch(() => {})
+      }
+      // Fix 2026-07-18: a failed push used to vanish silently — the challan then existed in
+      // neither plating's pending nor its challans (invisible lost material). Retry once, then
+      // make the failure LOUD + log it so Admin → Re-sync to Plating is actually run.
+      pushPlatingIncoming(feed).catch(() =>
+        pushPlatingIncoming(feed).catch(() => {
+          log('PLATING_SYNC_FAIL', `${code} did NOT reach Plating — run Owner → Admin → Re-sync to Plating`, who)
+          show(`⚠ Entry saved, but Plating sync FAILED for ${code}. Tell owner: Admin → Re-sync to Plating.`, 7000)
+        }))
     }
     log('SENT', `${welder}: ${filled.length} product/s${code ? ' · ' + code : ''} → ${party}${gaadi.trim() ? ' · gaadi …' + last4(gaadi) : ''}`, who)
     lastUsed.set({ ...lastUsed.get(), welder, finish, party })
@@ -203,7 +211,7 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
                 the verified history & the Plating sync cutoff) can be entered. */}
             <input type="date" value={date} onChange={e => setDate(e.target.value)}
               min={floor ? daysAgoStr(2) : (by === 'Owner' ? FREEZE_BEFORE : managerBack)}
-              max={by === 'Owner' ? undefined : todayStr()}
+              max={todayStr()}
               className="mt-1 w-full border-2 border-slate-300 rounded-2xl px-3 py-2.5 text-base font-semibold focus:outline-none focus:ring-4 focus:ring-amber-200 focus:border-amber-500" />
             {frozen && (
               <div className="mt-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-sm text-red-700 font-semibold">

@@ -10,10 +10,10 @@
  */
 import { useMemo, useState } from 'react'
 import { Button, Card, FieldLabel, SearchBar, Select, NumberInput, DateInput, TextInput, useToast, Toast } from '../../../core/ui'
-import { fmtDate, fmtNum } from '../../../core/utils/format'
+import { fmtDate, fmtNum, todayStr } from '../../../core/utils/format'
 import { useWelder } from '../WelderContext'
 import { lockedOn } from '../logic/pay'
-import { FINISHES, finishedName, EDIT_WINDOW_HOURS } from '../config'
+import { FINISHES, finishedName, EDIT_WINDOW_HOURS, FREEZE_BEFORE } from '../config'
 
 const within48 = (d, now) => {
   if (!d.createdAt) return true
@@ -50,6 +50,11 @@ export default function History({ owner = false, by = 'admin' }) {
 
   const saveEdit = (patch, changes, reason) => {
     if (!lockGuard(editing)) return
+    // Date-guards (fix 2026-07-18): also test the NEW date — an edit could move an entry into a
+    // finalized month past the guard (money recorded but dropped from the carry) or before the freeze.
+    if (patch.date && patch.date < FREEZE_BEFORE) { show(`Date before ${FREEZE_BEFORE} is frozen — not saved`, 2500); return }
+    if (patch.date && patch.date > todayStr()) { show('Future date not allowed — not saved', 2500); return }
+    if (patch.date && patch.date !== editing.date && !lockGuard({ ...editing, date: patch.date })) return
     dispatches.update(editing.id, patch)
     const detail = changes.map(c => `${c.field}: ${c.old}→${c.new}`).join(', ') + ` · reason: ${reason}`
     log('EDIT', detail, by, editing.id)

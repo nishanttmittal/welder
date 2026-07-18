@@ -14,6 +14,17 @@ import { DEFAULT_PRODUCTS, DEFAULT_WELDERS, DEFAULT_PARTIES } from './config'
 import { lastUsedStore, countersStore } from './data'
 import { WelderCtx } from './WelderContext'
 
+// Batch ops are CHUNKED (Firestore caps a WriteBatch at 500 ops — a bigger collection made the
+// old single-batch commit throw) — fix 2026-07-18.
+const CHUNK = 400
+async function chunkedBatch(items, op) {
+  for (let i = 0; i < items.length; i += CHUNK) {
+    const b = writeBatch(db)
+    items.slice(i, i + CHUNK).forEach((it) => op(b, it))
+    await b.commit()
+  }
+}
+
 // authKey re-subscribes the listener when the signed-in user changes (anon →
 // Google). Also tolerates permission-denied: staff are blocked from pay
 // collections (rates/payments/ledger/settlements), which simply stay empty.
@@ -32,12 +43,19 @@ function useCloudCollection(collPath, docPath, normalize, authKey) {
     insert: (rec) => { const id = rec.id || makeId('r'); const now = new Date().toISOString(); const row = { createdAt: now, updatedAt: now, ...rec, id }; setDoc(docPath(id), row); return row },
     update: (id, patch) => setDoc(docPath(id), { ...patch, updatedAt: new Date().toISOString() }, { merge: true }),
     remove: (id) => deleteDoc(docPath(id)),
-    removeWhere: (pred) => { const hit = list.filter(pred); const b = writeBatch(db); hit.forEach(r => b.delete(docPath(r.id))); b.commit(); return hit.length },
+    removeWhere: (pred) => { const hit = list.filter(pred); chunkedBatch(hit, (b, r) => b.delete(docPath(r.id))); return hit.length },
+    // WRITE-FIRST restore (fix 2026-07-18): the old delete-all-then-write left the collection
+    // EMPTY if anything interrupted between the two commits. Now the new data is written first
+    // (overwriting same ids), and only stale docs absent from the restored set are deleted after
+    // — at no moment is the data missing.
     replaceAll: async (rows) => {
-      const ex = await getDocs(collPath()); const b1 = writeBatch(db); ex.forEach(d => b1.delete(d.ref)); await b1.commit()
-      const b2 = writeBatch(db); (rows || []).forEach(r => { const id = r.id || makeId('r'); b2.set(docPath(id), { ...r, id }) }); await b2.commit()
+      const ex = await getDocs(collPath())
+      const next = (rows || []).map(r => { const id = r.id || makeId('r'); return { ...r, id } })
+      await chunkedBatch(next, (b, r) => b.set(docPath(r.id), r))
+      const keep = new Set(next.map(r => r.id))
+      await chunkedBatch(ex.docs.filter(d => !keep.has(d.id)), (b, d) => b.delete(d.ref))
     },
-    reset: async () => { const ex = await getDocs(collPath()); const b = writeBatch(db); ex.forEach(d => b.delete(d.ref)); await b.commit() },
+    reset: async () => { const ex = await getDocs(collPath()); await chunkedBatch(ex.docs, (b, d) => b.delete(d.ref)) },
   }
 }
 
@@ -95,6 +113,20 @@ export function FirestoreProvider({ children }) {
     setDoc(paths.logDoc(id), { id, ts: new Date().toISOString(), action, detail, by, ref })
   }, [])
 
+  // ONE-COMMIT multi-collection insert (fix 2026-07-18) — used by Hisab Finalize so the
+  // settlement payment and the settlement lock land together or not at all (the two separate
+  // writes could book a lock whose net references a payment that never arrived).
+  const atomicInsert = useCallback(async (entries) => {
+    const PATHS = { payments: paths.payment, settlements: paths.settlementDoc, ledger: paths.ledgerDoc }
+    const b = writeBatch(db); const rows = []
+    for (const { coll, rec } of entries) {
+      const id = rec.id || makeId('r'); const now = new Date().toISOString()
+      const row = { createdAt: now, updatedAt: now, ...rec, id }
+      b.set(PATHS[coll](id), row); rows.push(row)
+    }
+    await b.commit(); return rows
+  }, [])
+
   // First-run seeding (idempotent ids).
   const seededRef = useRef(false)
   useEffect(() => {
@@ -128,7 +160,7 @@ export function FirestoreProvider({ children }) {
 
   const value = {
     dispatches, products, welders, parties, platingOutbox, rates, payments, ledger, settlements, users, components, receipts, adjustments, logs,
-    lastUsed: lastUsedStore, counters: countersStore, log,
+    lastUsed: lastUsedStore, counters: countersStore, log, atomicInsert,
     cloud: { connected: !error, error },
   }
   return <WelderCtx.Provider value={value}>{children}</WelderCtx.Provider>

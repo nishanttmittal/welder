@@ -12,7 +12,8 @@ import { Button, Card, FieldLabel, NumberInput, Select, TextInput, DateInput, us
 import { todayStr, fmtNum, fmtDate } from '../../../core/utils/format'
 import { useWelder } from '../WelderContext'
 import { PAYMENT_MODES } from '../config'
-import { buildLedger, nextPaymentSlip, newPayment, lockedOn } from '../logic/pay'
+import { computeHisab, nextPaymentSlip, newPayment, lockedOn } from '../logic/pay'
+import { FREEZE_BEFORE } from '../config'
 
 const money = (n) => '₹' + fmtNum(Math.round(Number(n) || 0))
 
@@ -21,7 +22,7 @@ const fromPayment = (p) => ({ source: 'payment', id: p.id, contractor: p.contrac
 const fromLedger = (l) => ({ source: 'ledger', id: l.id, contractor: l.contractor || '', amount: Number(l.amount) || 0, date: l.date || '', mode: '', remark: l.note || '', slip: '', reversed: !!l.reversed })
 
 export default function Advances({ owner = false, by = 'owner' }) {
-  const { dispatches, rates, payments, ledger, welders, settlements, log } = useWelder()
+  const { dispatches, rates, payments, ledger, welders, settlements, products, log } = useWelder()
   const { msg, show } = useToast()
   const [filter, setFilter] = useState('')          // contractor name or '' = all
   const [periodMode, setPeriodMode] = useState('all')   // 'all' | 'month'
@@ -40,12 +41,18 @@ export default function Advances({ owner = false, by = 'owner' }) {
   }, [payments.list, ledger.list, filter, periodMode, month])
 
   // Per-contractor summary (only when one contractor is selected).
+  // FIX 2026-07-18 (review finding, MONEY-CRITICAL): "outstanding" now comes from computeHisab —
+  // the SAME engine as the Hisab screen. The old buildLedger call here skipped the referenceOnly
+  // exclusion (priced welder-entered material pcs as piece-work) and ignored finalized snapshots,
+  // showing e.g. ₹2.5L "Settle" for a welder actually IN ADVANCE. This figure now always equals
+  // the Hisab tab; the two screens can never contradict each other again.
+  const refProducts = useMemo(() => new Set(products.list.filter(p => p.referenceOnly).map(p => p.name)), [products.list])
   const summary = useMemo(() => {
     if (!filter) return null
     const paidPeriod = rows.filter(r => !r.reversed).reduce((s, r) => s + r.amount, 0)
-    const led = buildLedger(dispatches.list, rates.list, payments.list, ledger.list, filter, '', todayStr())
-    return { paidPeriod, outstanding: led.closing }
-  }, [filter, rows, dispatches.list, rates.list, payments.list, ledger.list])
+    const h = computeHisab({ dispatches: dispatches.list, rates: rates.list, payments: payments.list, ledger: ledger.list, settlements: settlements.list, refProducts, welder: filter, month: todayStr().slice(0, 7), today: todayStr() })
+    return { paidPeriod, outstanding: h.net }
+  }, [filter, rows, dispatches.list, rates.list, payments.list, ledger.list, settlements.list, refProducts])
 
   const coll = (src) => (src === 'payment' ? payments : ledger)
 
@@ -75,7 +82,13 @@ export default function Advances({ owner = false, by = 'owner' }) {
 
   const saveEdit = (patch) => {
     const r = edit
+    // Date-guards (fix 2026-07-18): the lock check must also test the NEW date — moving an entry
+    // INTO a finalized month past the guard recorded money that never reached the carry-forward.
+    // Also: no dates before the June freeze, no future dates.
+    if (patch.date && patch.date < FREEZE_BEFORE) { show(`Date before ${FREEZE_BEFORE} is frozen — pick June 2026 or later.`); return }
+    if (patch.date && patch.date > todayStr()) { show('Future date not allowed.'); return }
     if (!lockGuard(r)) return
+    if (patch.date && patch.date !== r.date && !lockGuard({ ...r, date: patch.date })) return
     if (r.source === 'payment') coll('payment').update(r.id, { amount: patch.amount, paymentDate: patch.date, date: patch.date, paymentMode: patch.mode, remark: patch.remark, note: patch.remark })
     else coll('ledger').update(r.id, { amount: patch.amount, date: patch.date, note: patch.remark })
     log('ADV_EDIT', `${r.slip || r.source} ${money(r.amount)}→${money(patch.amount)} · ${r.contractor} (${role})`, by)
@@ -122,7 +135,7 @@ export default function Advances({ owner = false, by = 'owner' }) {
           </div>
           <div className="grid grid-cols-2 gap-2 text-center">
             <div className="bg-slate-50 rounded-xl py-2"><div className="font-bold text-emerald-600">{money(summary.paidPeriod)}</div><div className="text-[10px] text-slate-400">Paid ({periodMode === 'all' ? 'all time' : month})</div></div>
-            <div className="bg-slate-50 rounded-xl py-2"><div className={`font-bold ${summary.outstanding > 0 ? 'text-red-600' : 'text-slate-700'}`}>{money(Math.abs(summary.outstanding))}</div><div className="text-[10px] text-slate-400">{summary.outstanding < 0 ? 'Advance/credit' : 'Outstanding (all-time)'}</div></div>
+            <div className="bg-slate-50 rounded-xl py-2"><div className={`font-bold ${summary.outstanding > 0 ? 'text-red-600' : 'text-slate-700'}`}>{money(Math.abs(summary.outstanding))}</div><div className="text-[10px] text-slate-400">{summary.outstanding < 0 ? 'Advance/credit' : 'Payable (same as Hisab)'}</div></div>
           </div>
           {summary.outstanding > 0 && (
             <Button size="sm" variant="success" className="w-full mt-3" onClick={settle}>💸 Settle {money(summary.outstanding)} (record payment)</Button>

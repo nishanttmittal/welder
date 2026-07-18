@@ -14,7 +14,7 @@ import { Button, Card, FieldLabel, NumberInput, Select, TextInput, DateInput, us
 import { todayStr, fmtNum, fmtDate } from '../../../core/utils/format'
 import { useWelder } from '../WelderContext'
 import { computeHisab, lockedOn, nextPaymentSlip, newPayment, paidByLabel } from '../logic/pay'
-import { PAYMENT_MODES } from '../config'
+import { PAYMENT_MODES, FREEZE_BEFORE } from '../config'
 
 const num = (v) => Number(v) || 0
 const money = (n) => '₹' + fmtNum(Math.round(num(n)))
@@ -23,7 +23,7 @@ const shiftMonth = (ym, d) => { const [y, m] = ym.split('-').map(Number); const 
 const monthLabel = (ym) => { const [y, m] = ym.split('-').map(Number); return new Date(y, m - 1, 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' }) }
 
 export default function Hisab({ owner = false, by = 'admin' }) {
-  const { dispatches, products, rates, payments, ledger, settlements, welders, log } = useWelder()
+  const { dispatches, products, rates, payments, ledger, settlements, welders, log, atomicInsert } = useWelder()
   const { msg, show } = useToast()
   const myRole = owner ? 'Owner' : 'Manager'
 
@@ -58,8 +58,16 @@ export default function Hisab({ owner = false, by = 'admin' }) {
     if (!confirm(`${welder}'s ${s.month} hisab is finalized & locked (up to ${s.cutoffDate}).\nChange this entry anyway?`)) return false
     return true
   }
+  // Date sanity for money entries (fix 2026-07-18): a mistyped year (e.g. 2025) used to land the
+  // amount silently in the earliest open window; future dates hid it in a not-yet month.
+  const dateOk = (date) => {
+    if (!date || date < FREEZE_BEFORE) { show(`Date must be ${FREEZE_BEFORE} or later (history is frozen).`, 2500); return false }
+    if (date > todayStr()) { show('Future date not allowed.', 2500); return false }
+    return true
+  }
   const addAdvance = ({ amount, date, note }) => {
     const v = num(amount); if (v <= 0) return show('Enter amount', 2000)
+    if (!dateOk(date)) return
     if (!lockGuard(date)) return
     ledger.insert({ contractor: welder, date, type: 'advance', direction: 'credit', amount: v, note: (note || '').trim(), createdBy: paidByLabel('', myRole), reversed: false })
     log('ADVANCE', `${welder} advance -${money(v)}${note ? ' · ' + note : ''} (${myRole})`, by)
@@ -67,6 +75,7 @@ export default function Hisab({ owner = false, by = 'admin' }) {
   }
   const addPayment = ({ amount, date, mode, note }) => {
     const v = num(amount); if (v <= 0) return show('Enter amount', 2000)
+    if (!dateOk(date)) return
     if (!lockGuard(date)) return
     const slip = nextPaymentSlip(payments.list)
     payments.insert(newPayment({ slip, contractor: welder, amount: v, date, mode, remark: note, paidByUser: '', paidByRole: myRole }))
@@ -75,6 +84,7 @@ export default function Hisab({ owner = false, by = 'admin' }) {
   }
   const addAdjustment = ({ amount, date, note, direction }) => {
     const v = num(amount); if (v <= 0) return show('Enter amount', 2000)
+    if (!dateOk(date)) return
     if (!lockGuard(date)) return
     ledger.insert({ contractor: welder, date, type: 'adjustment', direction: direction || 'credit', amount: v, note: (note || '').trim(), createdBy: paidByLabel('', myRole), reversed: false })
     log('ADJUSTMENT', `${welder} adj ${direction === 'debit' ? '+' : '-'}${money(v)}${note ? ' · ' + note : ''} (${myRole})`, by)
@@ -110,20 +120,29 @@ export default function Hisab({ owner = false, by = 'admin' }) {
     doc.save(`hisab-${welder}-${month}.pdf`); show('PDF ready ✓')
   }
 
-  const finalize = ({ dayPay }) => {
+  const finalize = async ({ dayPay }) => {
     if (h.locked) return show('Already finalized', 2000)
     const dp = num(dayPay), cutoff = todayStr()
-    if (dp > 0) {
-      const slip = nextPaymentSlip(payments.list)
-      payments.insert(newPayment({ slip, contractor: welder, amount: dp, date: cutoff, mode: 'Cash', remark: 'Hisab settlement', paidByUser: '', paidByRole: myRole }))
-      log('PAYMENT', `${slip} · ${welder} ${money(dp)} (settlement)`, by, slip)
-    }
+    const slip = dp > 0 ? nextPaymentSlip(payments.list) : ''
+    const payRow = dp > 0 ? newPayment({ slip, contractor: welder, amount: dp, date: cutoff, mode: 'Cash', remark: 'Hisab settlement', paidByUser: '', paidByRole: myRole }) : null
     const net = h.net - dp
-    settlements.insert({ welder, month, periodFrom: `${month}-01`, periodTo: cutoff, cutoffDate: cutoff, opening: h.opening, earned: h.earned, advances: h.advTotal, payments: h.payTotal + dp, dayPayment: dp, net, finalizedBy: by, locked: true })
+    const setRow = { welder, month, periodFrom: `${month}-01`, periodTo: cutoff, cutoffDate: cutoff, opening: h.opening, earned: h.earned, advances: h.advTotal, payments: h.payTotal + dp, dayPayment: dp, net, finalizedBy: by, locked: true }
+    // ONE commit for payment + settlement (fix 2026-07-18): two separate writes could book a lock
+    // whose net references a payment that never landed (and a retry would insert the payment twice).
+    try {
+      if (atomicInsert) await atomicInsert([...(payRow ? [{ coll: 'payments', rec: payRow }] : []), { coll: 'settlements', rec: setRow }])
+      else { if (payRow) payments.insert(payRow); settlements.insert(setRow) }   // local/offline fallback
+    } catch { return show('Could not finalize — check internet and try again. Nothing was saved.', 3500) }
+    if (payRow) log('PAYMENT', `${slip} · ${welder} ${money(dp)} (settlement)`, by, slip)
     log('SETTLEMENT_FINALIZE', `${welder} ${month} · earned ${money(h.earned)} net ${money(net)} (lock ≤ ${cutoff})`, by)
     show('Hisab finalized & locked ✓'); setFinalizing(false); exportPDF()
   }
   const reopen = () => {
+    // Guard (fix 2026-07-18): reopening an EARLIER month while a later month is still finalized
+    // silently corrupts the later months' openings/windows (verified −₹1L+ divergence on real
+    // data) while their frozen carries stay — displayed vs stored diverge. Unwind latest-first.
+    const later = (settlements.list || []).filter(s => s.welder === welder && s.locked !== false && s.month > month)
+    if (later.length) { show(`Cannot reopen ${month} — ${later.map(s => s.month).sort().join(', ')} is finalized on top. Reopen the LATEST month first.`, 4000); return }
     if (!confirm(`Reopen ${welder}'s ${month} hisab for editing?`)) return
     settlements.update(h.settlement.id, { locked: false }); log('SETTLEMENT_REOPEN', `${welder} ${month}`, by); show('Reopened ✓')
   }
