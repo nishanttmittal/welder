@@ -131,14 +131,18 @@ export const paidFor = (payments, contractor, from, to) =>
     .reduce((s, p) => s + num(p.amount), 0)
 
 /* Slip-number alphabet: no 0/O/1/I/L/U, so a worker can never misread a
-   printed or handwritten slip. 31 chars. */
+   printed or handwritten slip. 30 chars. */
 const SLIP_ALPHABET = '23456789ABCDEFGHJKMNPQRSTVWXYZ'
 
-/** 5 random chars (30^5 = 24.3M combinations). Uses crypto when available.
+/** 6 random chars (30^6 = 729M combinations). Uses crypto when available.
+ *  Sized for money: with 6 chars, two phones drawing the same counter value at
+ *  the same instant collide about once in 729 million. Note collisions only
+ *  matter WITHIN one counter value - different counters already differ - so the
+ *  real-world rate is lower still.
  *  Deliberately stores NOTHING: a per-device id would regenerate if browser
  *  storage is cleared or the app is reinstalled, which is exactly the case
  *  that must stay collision-free. Random-per-slip has no such state. */
-function slipSuffix(n = 5) {
+function slipSuffix(n = 6) {
   const out = []
   const c = globalThis.crypto
   if (c && typeof c.getRandomValues === 'function') {
@@ -151,12 +155,12 @@ function slipSuffix(n = 5) {
   return out.join('')
 }
 
-/** Next payment slip number — e.g. UMP-PAY-0042-K7M9.
+/** Next payment slip number — e.g. UMP-PAY-0042-K7M9QX.
  *
  *  The leading counter stays human-readable and roughly sequential. The random
  *  suffix is what makes it UNIQUE: two phones paying at the same moment used to
  *  both derive UMP-PAY-0042 from their own copy of the list and collide on a
- *  cash payment. Now they produce UMP-PAY-0042-K7M9 and UMP-PAY-0042-QX3B.
+ *  cash payment. Now they produce UMP-PAY-0042-K7M9QX and UMP-PAY-0042-Q3BRTV.
  *
  *  Works fully OFFLINE — no server round-trip (a Firestore counter was
  *  rejected for exactly that reason). Old slips without a suffix stay valid and
