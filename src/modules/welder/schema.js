@@ -165,7 +165,11 @@ export const rateSchema = [
 
 /**
  * A payment made to a contractor. Recorded by Manager or Owner. Each gets a
- * unique slip number (UMP-PAY-0001…). No payment time — date only.
+ * unique slip number. Format since 2026-07-19: UMP-PAY-0042-K7M9Q — a readable
+ * running counter plus a random suffix that makes it collision-proof when two
+ * phones pay at the same moment (offline-safe, no server counter). Older slips
+ * without a suffix (UMP-PAY-0041) remain valid and are never rewritten.
+ * No payment time — date only.
  * Legacy fields `date`/`note` are kept and mirrored (paymentDate/remark) so old
  * payments and existing reports keep working unchanged.
  * `reversed` lets the owner cancel a payment without deleting history.

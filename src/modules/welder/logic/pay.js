@@ -130,11 +130,41 @@ export const paidFor = (payments, contractor, from, to) =>
     && (!from || pDate(p) >= from) && (!to || pDate(p) <= to))
     .reduce((s, p) => s + num(p.amount), 0)
 
-/** Next unique payment slip number — derived from data, crash-safe. */
+/* Slip-number alphabet: no 0/O/1/I/L/U, so a worker can never misread a
+   printed or handwritten slip. 31 chars. */
+const SLIP_ALPHABET = '23456789ABCDEFGHJKMNPQRSTVWXYZ'
+
+/** 5 random chars (30^5 = 24.3M combinations). Uses crypto when available.
+ *  Deliberately stores NOTHING: a per-device id would regenerate if browser
+ *  storage is cleared or the app is reinstalled, which is exactly the case
+ *  that must stay collision-free. Random-per-slip has no such state. */
+function slipSuffix(n = 5) {
+  const out = []
+  const c = globalThis.crypto
+  if (c && typeof c.getRandomValues === 'function') {
+    const buf = new Uint8Array(n)
+    c.getRandomValues(buf)
+    for (let i = 0; i < n; i++) out.push(SLIP_ALPHABET[buf[i] % SLIP_ALPHABET.length])
+  } else {
+    for (let i = 0; i < n; i++) out.push(SLIP_ALPHABET[Math.floor(Math.random() * SLIP_ALPHABET.length)])
+  }
+  return out.join('')
+}
+
+/** Next payment slip number — e.g. UMP-PAY-0042-K7M9.
+ *
+ *  The leading counter stays human-readable and roughly sequential. The random
+ *  suffix is what makes it UNIQUE: two phones paying at the same moment used to
+ *  both derive UMP-PAY-0042 from their own copy of the list and collide on a
+ *  cash payment. Now they produce UMP-PAY-0042-K7M9 and UMP-PAY-0042-QX3B.
+ *
+ *  Works fully OFFLINE — no server round-trip (a Firestore counter was
+ *  rejected for exactly that reason). Old slips without a suffix stay valid and
+ *  are never rewritten; the counter regex below still reads them. */
 export function nextPaymentSlip(payments) {
   let max = 0
   for (const p of (payments || [])) { const m = /UMP-PAY-(\d+)/.exec(p.paymentSlipNo || ''); if (m) max = Math.max(max, Number(m[1]) || 0) }
-  return `UMP-PAY-${String(max + 1).padStart(4, '0')}`
+  return `UMP-PAY-${String(max + 1).padStart(4, '0')}-${slipSuffix()}`
 }
 
 /** Assemble a payment record (one shape, used by every entry point). */
