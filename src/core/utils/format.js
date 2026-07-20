@@ -7,19 +7,29 @@ export const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ]
 
-/** ISO yyyy-mm-dd for today.
- *  WARNING - KNOWN BUG (verified 2026-07-19, not yet fixed):
- *  toISOString() returns a UTC date, NOT local. Between 00:00 and 05:29 IST
- *  this gives YESTERDAY's date, so early-morning entries file under the wrong
- *  day. Correct fix = format the date in the Asia/Kolkata timezone.
- *  Deliberately NOT changed yet: it alters which day an entry is dated under,
- *  which touches money/reporting. Needs owner sign-off. Same bug in daysAgoStr. */
-export const todayStr = () => new Date().toISOString().slice(0, 10)
+/* The factory runs on India time, so "today" must mean today IN INDIA — never
+   the server's or browser's timezone. en-CA formats as YYYY-MM-DD directly. */
+const IST_DATE = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit',
+})
 
-/** ISO yyyy-mm-dd for N days before today (local). */
+/** ISO yyyy-mm-dd for today, in Asia/Kolkata.
+ *
+ *  FIXED 2026-07-20 (owner: entries belong to the real calendar day).
+ *  Was `new Date().toISOString().slice(0,10)`, which is UTC — between 00:00 and
+ *  05:29 IST that returned YESTERDAY. That didn't just mis-date entries: because
+ *  screens validate with `date > todayStr()` and cap pickers with
+ *  `max={todayStr()}`, an early-morning entry for the real today was rejected as
+ *  "Future date not allowed". Existing records are NOT rewritten — old
+ *  early-morning entries keep the date they were saved with. */
+export const todayStr = () => IST_DATE.format(new Date())
+
+/** ISO yyyy-mm-dd for N days before today, in Asia/Kolkata.
+ *  Anchored at noon UTC so adding/subtracting days can never slip a day at a
+ *  timezone boundary. */
 export const daysAgoStr = (n) => {
-  const d = new Date()
-  d.setDate(d.getDate() - n)
+  const d = new Date(todayStr() + 'T12:00:00Z')
+  d.setUTCDate(d.getUTCDate() - n)
   return d.toISOString().slice(0, 10)
 }
 
