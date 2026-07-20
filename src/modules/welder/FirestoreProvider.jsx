@@ -9,6 +9,7 @@ import { onSnapshot, getDocs } from '../../core/db/readmeter'   // metered reads
 import { db, paths, ensureSignedIn, watchAuth } from '../../core/db/firebase'
 import { makeNormalizer } from '../../core/schema/field'
 import { makeId } from '../../core/db/repository'
+import { SaveStatus } from '../../core/ui'
 import { dispatchSchema, productSchema, welderSchema, partySchema, platingOutboxSchema, rateSchema, paymentSchema, ledgerSchema, settlementSchema, userSchema, componentSchema, receiptSchema, adjustmentSchema } from './schema'
 import { DEFAULT_PRODUCTS, DEFAULT_WELDERS, DEFAULT_PARTIES } from './config'
 import { lastUsedStore, countersStore } from './data'
@@ -30,19 +31,39 @@ async function chunkedBatch(items, op) {
 // collections (rates/payments/ledger/settlements), which simply stay empty.
 function useCloudCollection(collPath, docPath, normalize, authKey) {
   const [list, setList] = useState([])
+  // Save state, so a worker can tell a real save from a lost one.
+  //   pending — written locally, not yet acknowledged by the server. NORMAL on
+  //             the factory floor; it is not an error and must not look like one.
+  //   failed  — the write was actually rejected (permissions, bad data).
+  const [pending, setPending] = useState(false)
+  const [failed, setFailed] = useState(0)
   useEffect(() => {
     const unsub = onSnapshot(
       collPath(),
-      (snap) => setList(snap.docs.map(d => normalize({ id: d.id, ...d.data() }))),
+      // includeMetadataChanges is what makes hasPendingWrites update as writes
+      // settle. WITHOUT it we'd only hear about data changes and the indicator
+      // would stick. Note we deliberately do NOT drive this off awaiting the
+      // write promise: with offline persistence that promise does not resolve
+      // until reconnect, so awaiting it would show a permanent spinner offline.
+      { includeMetadataChanges: true },
+      (snap) => {
+        setList(snap.docs.map(d => normalize({ id: d.id, ...d.data() })))
+        setPending(snap.metadata.hasPendingWrites)
+      },
       () => setList([])
     )
     return unsub
   }, [authKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  // A rejected write is a real failure worth surfacing; a slow one is not.
+  const track = (p) => { Promise.resolve(p).catch(() => setFailed(n => n + 1)); return p }
   return {
     list,
-    insert: (rec) => { const id = rec.id || makeId('r'); const now = new Date().toISOString(); const row = { createdAt: now, updatedAt: now, ...rec, id }; setDoc(docPath(id), row); return row },
-    update: (id, patch) => setDoc(docPath(id), { ...patch, updatedAt: new Date().toISOString() }, { merge: true }),
-    remove: (id) => deleteDoc(docPath(id)),
+    pending,
+    failed,
+    clearFailed: () => setFailed(0),
+    insert: (rec) => { const id = rec.id || makeId('r'); const now = new Date().toISOString(); const row = { createdAt: now, updatedAt: now, ...rec, id }; track(setDoc(docPath(id), row)); return row },
+    update: (id, patch) => track(setDoc(docPath(id), { ...patch, updatedAt: new Date().toISOString() }, { merge: true })),
+    remove: (id) => track(deleteDoc(docPath(id))),
     removeWhere: (pred) => { const hit = list.filter(pred); chunkedBatch(hit, (b, r) => b.delete(docPath(r.id))); return hit.length },
     // WRITE-FIRST restore (fix 2026-07-18): the old delete-all-then-write left the collection
     // EMPTY if anything interrupted between the two commits. Now the new data is written first
@@ -158,10 +179,28 @@ export function FirestoreProvider({ children }) {
     )
   }
 
+  // One save state for the whole app. `logs` is excluded on purpose — an audit
+  // line still syncing is not something a worker should be told about.
+  const tracked = [dispatches, products, welders, parties, platingOutbox, rates,
+    payments, ledger, settlements, users, components, receipts, adjustments]
+  const saveState = {
+    pending: tracked.some(c => c.pending),
+    failed: tracked.reduce((n, c) => n + c.failed, 0),
+    clearFailed: () => tracked.forEach(c => c.clearFailed()),
+  }
+
   const value = {
     dispatches, products, welders, parties, platingOutbox, rates, payments, ledger, settlements, users, components, receipts, adjustments, logs,
     lastUsed: lastUsedStore, counters: countersStore, log, atomicInsert,
     cloud: { connected: !error, error },
+    saveState,
   }
-  return <WelderCtx.Provider value={value}>{children}</WelderCtx.Provider>
+  return (
+    <WelderCtx.Provider value={value}>
+      {children}
+      {/* Rendered here so every screen in the module gets it without each page
+          having to remember to add it. */}
+      <SaveStatus pending={saveState.pending} failed={saveState.failed} onDismiss={saveState.clearFailed} />
+    </WelderCtx.Provider>
+  )
 }
