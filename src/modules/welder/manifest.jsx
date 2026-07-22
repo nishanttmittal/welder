@@ -11,6 +11,7 @@ import Hisab from './pages/Hisab'
 import Rates from './pages/Rates'
 import Ledger from './pages/Ledger'
 import Advances from './pages/Advances'
+import IncomingAdvances from './pages/IncomingAdvances'
 import RawMaterialStock from './pages/RawMaterialStock'
 import MaterialsRecipe from './pages/MaterialsRecipe'
 import Dashboard from './pages/Dashboard'
@@ -63,6 +64,7 @@ export const welderModule = {
     { key: 'ledger',    group: 'Owner tools', title: 'Contractor Ledger', desc: 'Full running balance & settlement', icon: '📒', color: 'from-teal-600 to-teal-700', roles: ['owner'], Component: Ledger },
     { key: 'finaldispatch', group: 'Owner tools', title: 'Add to Hisab (Final Dispatch)', desc: 'Pay a few items on finished-dispatch qty', icon: '🎯', color: 'from-purple-600 to-purple-700', roles: ['owner'], Component: FinalDispatchPay },
     { key: 'advances',  group: 'Owner tools', title: 'Manage Advances', desc: 'Fix / reassign / delete advances & payments', icon: '💵', color: 'from-rose-600 to-rose-700', roles: ['owner'], Component: Advances },
+    { key: 'incoming',  group: 'Owner tools', title: 'Incoming Advances', desc: 'Accept advances pushed from UNICO Hisab', icon: '📥', color: 'from-rose-500 to-rose-600', roles: ['owner'], Component: IncomingAdvances },
     { key: 'materials', group: 'Owner tools', title: 'Materials & Recipe', desc: 'Raw materials + product recipes',  icon: '🧪', color: 'from-indigo-600 to-indigo-700', roles: ['owner'], Component: MaterialsRecipe },
     { key: 'admin',     group: 'Owner tools', title: 'Admin',          desc: 'Rates, users, products, backup',       icon: '⚙️', color: 'from-slate-600 to-slate-700', roles: ['owner'], Component: Admin },
   ],
