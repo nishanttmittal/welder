@@ -19,6 +19,7 @@ import History from './pages/History'
 import Export from './pages/Export'
 import FinalDispatchPay from './pages/FinalDispatchPay'
 import Admin from './pages/Admin'
+import ResyncPlatingPage from './pages/ResyncPlating'
 
 function HomeStats() {
   const { dispatches, welders } = useWelder()
@@ -58,6 +59,7 @@ export const welderModule = {
     { key: 'hisab',     group: 'Daily work', title: 'Hisab',          desc: 'Earnings, advances, payments & balance', icon: '💰', color: 'from-emerald-600 to-emerald-700', roles: ['incharge', 'owner'], Component: Hisab },
     { key: 'dashboard', group: 'Daily work', title: 'Dashboard',      desc: 'Daily totals, by welder, product & party', icon: '📊', color: 'from-blue-600 to-blue-700',   roles: ['incharge', 'owner'], Component: Dashboard },
     { key: 'stock',     group: 'Daily work', title: 'Raw Material Stock', desc: 'Balance + add incoming stock',      icon: '📦', color: 'from-cyan-600 to-cyan-700',   roles: ['incharge', 'owner'], Component: RawMaterialStock },
+    { key: 'resync',    group: 'Daily work', title: 'Re-sync to Plating', desc: 'Re-send pending chrome/gold/rose challans to Plating', icon: '🔄', color: 'from-cyan-500 to-cyan-600', roles: ['incharge', 'owner'], Component: ResyncPlatingPage },
     // ---- Owner tools (settings & money tools) ----
     { key: 'export',    group: 'Owner tools', title: 'Export / Share', desc: 'Daily PDF report for WhatsApp',        icon: '📄', color: 'from-violet-600 to-violet-700', roles: ['owner'], Component: Export },
     { key: 'pay',       group: 'Owner tools', title: 'Rates', desc: 'Set piece rate per product (with history)', icon: '📈', color: 'from-emerald-500 to-emerald-600', roles: ['owner'], Component: Rates },
