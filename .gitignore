@@ -2,3 +2,4 @@ node_modules
 dist
 *fail*.png
 .DS_Store
+.firebase/
