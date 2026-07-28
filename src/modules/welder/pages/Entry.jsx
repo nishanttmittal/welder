@@ -9,7 +9,7 @@ import { useMemo, useState, useEffect, useRef } from 'react'
 import { Button, Card, FieldLabel, Select, NumberInput, TextInput, useToast, Toast } from '../../../core/ui'
 import { todayStr, daysAgoStr, fmtNum, fmtDate } from '../../../core/utils/format'
 import { useWelder } from '../WelderContext'
-import { FINISHES, finishedName, isPlatingFinish, SOURCE_APP, WORKFLOW_STAGE, DEFAULT_FACTORY_ID, PLATING_SYNC_FROM, FREEZE_BEFORE, BACKFILL_LOCK_DATE } from '../config'
+import { FINISHES, finishedName, isPlatingFinish, SOURCE_APP, WORKFLOW_STAGE, DEFAULT_FACTORY_ID, PLATING_SYNC_FROM, FREEZE_BEFORE, BACKFILL_LOCK_DATE, BACKFILL_FROM } from '../config'
 import { nextWelderChallan, last4 } from '../logic/platingBridge'
 import { computeStock, recipeOf } from '../logic/stock'
 import { makeId } from '../../../core/db/repository'
@@ -65,14 +65,17 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
     .filter(d => d.date === date && (!welder || d.welder === welder))
     .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
   const canEditDay = date >= daysAgoStr(2)
-  // June/July backfill window: until BACKFILL_LOCK_DATE, a Manager (Anshul) may
-  // back-date all the way to FREEZE_BEFORE to fill the June/July dispatches the
-  // welders never entered. On/after that date the Manager window reverts to the
-  // normal last-7-days rule — which locks June/July for staff. Owner keeps its
-  // override (can always reach FREEZE_BEFORE); shop floor is unchanged.
-  // See config.js → BACKFILL_LOCK_DATE.
+  // Manager backfill window: until BACKFILL_LOCK_DATE, a Manager (Anshul) may
+  // back-date to BACKFILL_FROM to fill dispatches a welder who was away never
+  // entered. On/after that date the Manager window reverts to the normal
+  // last-7-days rule automatically (no redeploy). Owner keeps its override (can
+  // always reach FREEZE_BEFORE); shop floor is unchanged.
+  // See config.js → BACKFILL_LOCK_DATE / BACKFILL_FROM.
   const backfillOpen = todayStr() < BACKFILL_LOCK_DATE
-  const managerBack = backfillOpen ? FREEZE_BEFORE : daysAgoStr(7)
+  // Never let the backfill reach behind the verified-history freeze.
+  const managerBack = backfillOpen
+    ? (BACKFILL_FROM > FREEZE_BEFORE ? BACKFILL_FROM : FREEZE_BEFORE)
+    : daysAgoStr(7)
   // Manager date rule. Owner & shop floor have their own windows.
   const managerDateOk = floor || by === 'Owner' || date >= managerBack
   // History freeze: nobody (incl. owner) may create/back-date before this. Unchanged.
@@ -109,7 +112,7 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
     if (plating && !gaadi.trim()) return show('Enter the gaadi (vehicle) number', 2500)
     if (filled.length === 0) return show('Add at least one product + quantity', 2500)
     if (frozen) return show(`🔒 Dates before ${FREEZE_BEFORE} are locked (verified history). Pick 1 June 2026 or later.`, 3500)
-    if (!managerDateOk) return show('That date is locked — use the last 7 days', 3000)
+    if (!managerDateOk) return show(`That date is locked — pick ${fmtDate(managerBack)} or later`, 3000)
     // Duplicate alarm: same product + same gaadi already entered today.
     const g = gaadi.trim()
     const dups = g ? filled.filter(it => dispatches.list.some(d => d.date === date && (d.gaadi || '') === g && d.productName === it.product && Number(d.qty) > 0)).map(it => it.product) : []
@@ -204,7 +207,7 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
               : <Select className="mt-1" value={welder} onChange={e => setWelder(e.target.value)} options={welders.list.map(w => ({ value: w.name, label: w.name }))} />}
           </div>
           <div>
-            <FieldLabel>Date {floor ? <span className="text-slate-400 font-normal normal-case">(today or last 2 days)</span> : (by !== 'Owner' && <span className="text-slate-400 font-normal normal-case">({backfillOpen ? 'June–July backfill open' : 'last 7 days'})</span>)}</FieldLabel>
+            <FieldLabel>Date {floor ? <span className="text-slate-400 font-normal normal-case">(today or last 2 days)</span> : (by !== 'Owner' && <span className="text-slate-400 font-normal normal-case">({backfillOpen ? `backfill open from ${fmtDate(managerBack)}` : 'last 7 days'})</span>)}</FieldLabel>
             {/* Date window by role: shop floor = today + last 2 days; Manager =
                 last 7 days (managerDateOk is the real guard on save); Owner = back
                 to the freeze cutoff only. NOTHING before FREEZE_BEFORE (=1 June,

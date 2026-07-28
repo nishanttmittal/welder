@@ -136,21 +136,26 @@ export const PLATING_SYNC_FROM = '2026-06-01'
 export const FREEZE_BEFORE = '2026-06-01'
 
 /**
- * JUNE–JULY BACKFILL WINDOW (temporary, one-shot).
- * Some welders never entered their June/July dispatches. Anshul (Manager) fills
- * those gaps. While open, the Manager can back-date all the way to FREEZE_BEFORE
- * (1 June); Owner can always do so regardless. On BACKFILL_LOCK_DATE the Manager
- * window auto-reverts to the normal last-7-days rule, re-locking June/July for
- * staff (Owner keeps its override). Flips by calendar date — no redeploy to lock.
+ * MANAGER BACKFILL WINDOW (temporary, re-openable).
+ * When a welder is away and never enters his own dispatches, the Manager (Anshul)
+ * fills the gap. While open, the Manager can back-date to BACKFILL_FROM instead of
+ * the normal last-7-days rule; Owner can always reach FREEZE_BEFORE regardless.
+ * On BACKFILL_LOCK_DATE the Manager window auto-reverts to last-7-days — it flips
+ * by calendar date, so NO redeploy is needed to close it.
  *
- * 2026-07-13: Owner asked to KEEP entries open for himself + Anshul until the
- * month hisab (June & July) is finalised; lock was pushed to 2026-08-15.
- * CLOSED SAME DAY (2026-07-13): owner confirmed both months' data is updated, so
- * the lock is set to today — the Manager reverts to the normal last-7-days rule
- * now. Owner override intact; no data touched. To reopen a backfill later, push
- * this date out again. Once well past, this constant + the backfill logic can be removed.
+ * History:
+ * - Jun–Jul backfill opened, then CLOSED 2026-07-13 (owner confirmed both months done).
+ * - 2026-07-28 (owner request): Jitender was at home and made no entries, so the
+ *   window is REOPENED for Anshul from 15 July. Open today + tomorrow; it
+ *   auto-closes on 2026-07-30. Owner override intact; no existing data touched.
+ * To reopen later: push BACKFILL_LOCK_DATE out and set BACKFILL_FROM to the
+ * earliest date the Manager should reach (never earlier than FREEZE_BEFORE).
  */
-export const BACKFILL_LOCK_DATE = '2026-07-13'
+export const BACKFILL_LOCK_DATE = '2026-07-30'
+
+/** Earliest date the Manager may back-date to while the backfill window is open.
+ *  Clamped by FREEZE_BEFORE — verified history can never be re-opened. */
+export const BACKFILL_FROM = '2026-07-15'
 
 /** Welder challan prefix from the welder's name, e.g. "Naveen" → "NAV". */
 export const welderPrefix = (name) => ((name || '').replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase() || 'WLD')
