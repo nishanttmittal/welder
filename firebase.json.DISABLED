@@ -1,0 +1,6 @@
+{
+  "_DISABLED_2026-08-04": "DO NOT RESTORE THIS FILE.",
+  "_why": "This config targeted the separate site 'unico-welder' — the ABANDONED per-app-site approach. Google sign-in is permanently broken there (redirect_uri_mismatch, July 2026) because its OAuth redirect URI was never registered. Deploying here would publish welder to a site nobody can log in to.",
+  "_deploy_from": "~/unico-default-site/ ONLY (welder ships at /welder/ on unico-operations.firebaseapp.com).",
+  "_see": "memory/rule-no-multisite-hosting.md"
+}
