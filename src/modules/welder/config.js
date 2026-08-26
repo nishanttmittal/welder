@@ -148,14 +148,19 @@ export const FREEZE_BEFORE = '2026-06-01'
  * - 2026-07-28 (owner request): Jitender was at home and made no entries, so the
  *   window is REOPENED for Anshul from 15 July. Open today + tomorrow; it
  *   auto-closes on 2026-07-30. Owner override intact; no existing data touched.
+ * - 2026-08-12 (owner request): reopen July + August for Anshul to check on
+ *   13 August. Open from 1 July through 13 August; auto-close on 14 August.
+ * - 2026-08-26 (owner request): reopen August so Jitender's month is completed
+ *   (Anshul enters, picking Jitender in the Welder dropdown). Open from 1 August
+ *   through month end; auto-closes on 1 September.
  * To reopen later: push BACKFILL_LOCK_DATE out and set BACKFILL_FROM to the
  * earliest date the Manager should reach (never earlier than FREEZE_BEFORE).
  */
-export const BACKFILL_LOCK_DATE = '2026-07-30'
+export const BACKFILL_LOCK_DATE = '2026-09-01'
 
 /** Earliest date the Manager may back-date to while the backfill window is open.
  *  Clamped by FREEZE_BEFORE — verified history can never be re-opened. */
-export const BACKFILL_FROM = '2026-07-15'
+export const BACKFILL_FROM = '2026-08-01'
 
 /** Welder challan prefix from the welder's name, e.g. "Naveen" → "NAV". */
 export const welderPrefix = (name) => ((name || '').replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase() || 'WLD')
