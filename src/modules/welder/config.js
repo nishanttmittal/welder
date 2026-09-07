@@ -153,10 +153,12 @@ export const FREEZE_BEFORE = '2026-06-01'
  * - 2026-08-26 (owner request): reopen August so Jitender's month is completed
  *   (Anshul enters, picking Jitender in the Welder dropdown). Open from 1 August
  *   through month end; auto-closes on 1 September.
+ * - 2026-09-07 (owner request): reopen August AND September for Anshul. Open from
+ *   1 August through 30 September; auto-closes on 1 October.
  * To reopen later: push BACKFILL_LOCK_DATE out and set BACKFILL_FROM to the
  * earliest date the Manager should reach (never earlier than FREEZE_BEFORE).
  */
-export const BACKFILL_LOCK_DATE = '2026-09-01'
+export const BACKFILL_LOCK_DATE = '2026-10-01'
 
 /** Earliest date the Manager may back-date to while the backfill window is open.
  *  Clamped by FREEZE_BEFORE — verified history can never be re-opened. */
