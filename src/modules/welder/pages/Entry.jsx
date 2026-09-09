@@ -246,8 +246,8 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
                 this one line tells us the rule in force AND whether the phone is
                 on a stale cached build. */}
             {!floor && (
-              <div className="mt-1 text-[10px] text-slate-400">
-                {by === 'Owner' ? `earliest: ${fmtDate(FREEZE_BEFORE)}` : `earliest: ${fmtDate(managerBack)}`} · build {__BUILD_ID__}
+              <div className="mt-1.5 text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">
+                ℹ️ earliest date: <span className="font-bold text-slate-700">{by === 'Owner' ? fmtDate(FREEZE_BEFORE) : fmtDate(managerBack)}</span> · build {__BUILD_ID__}
               </div>
             )}
           </div>
