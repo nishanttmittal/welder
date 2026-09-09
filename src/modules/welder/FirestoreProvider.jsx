@@ -37,6 +37,12 @@ function useCloudCollection(collPath, docPath, normalize, authKey) {
   //   failed  — the write was actually rejected (permissions, bad data).
   const [pending, setPending] = useState(false)
   const [failed, setFailed] = useState(0)
+  // loaded — has the server (or cache) actually answered for this collection?
+  // A listener ERROR (quota exhausted, rules deny, offline first-run) also
+  // yields an EMPTY list, which is indistinguishable from "genuinely empty".
+  // Anything that must FAIL CLOSED on missing data (see Entry.jsx's hisab lock)
+  // has to check this flag, never just `list.length`.
+  const [loaded, setLoaded] = useState(false)
   useEffect(() => {
     const unsub = onSnapshot(
       collPath(),
@@ -49,8 +55,9 @@ function useCloudCollection(collPath, docPath, normalize, authKey) {
       (snap) => {
         setList(snap.docs.map(d => normalize({ id: d.id, ...d.data() })))
         setPending(snap.metadata.hasPendingWrites)
+        setLoaded(true)
       },
-      () => setList([])
+      () => { setList([]); setLoaded(false) }
     )
     return unsub
   }, [authKey]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -58,6 +65,7 @@ function useCloudCollection(collPath, docPath, normalize, authKey) {
   const track = (p) => { Promise.resolve(p).catch(() => setFailed(n => n + 1)); return p }
   return {
     list,
+    loaded,
     pending,
     failed,
     clearFailed: () => setFailed(0),

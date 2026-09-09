@@ -192,6 +192,27 @@ export function lockedOn(settlements, welder, date) {
   return settlements.find(s => s.welder === welder && s.locked !== false && (s.cutoffDate || '') >= date) || null
 }
 
+/**
+ * Is this welder+date inside a FINALIZED MONTH? Stricter than lockedOn() and it
+ * is the right guard for PRODUCTION (dispatch) entries.
+ *
+ * Why the month and not just the cut-off: computeHisab recomputes `earned` over
+ * the WHOLE calendar month (mFrom..mTo) every time it runs, but the settlement
+ * stores a SNAPSHOT `net` that becomes the next month's `opening`. So a dispatch
+ * dated 28-Aug added after August was finalized on 26-Aug would change what the
+ * August hisab screen shows while the money already carried forward stays put —
+ * a silent divergence. Blocking the whole finalized month closes that.
+ *
+ * Payments/advances deliberately keep the looser cut-off rule (lockedOn) — they
+ * belong to the open settlement window, not to a calendar month.
+ */
+export function monthLockedOn(settlements, welder, date) {
+  if (!settlements || !date) return null
+  const ym = date.slice(0, 7)
+  return settlements.find(s => s.welder === welder && s.locked !== false &&
+    (s.month === ym || (s.cutoffDate || '') >= date)) || null
+}
+
 /** "Sri Ram (Manager)" / "Manager" / "" from a payment or ledger record. */
 export const paidByLabel = (user, role) =>
   user && role ? `${user} (${role})` : (user || role || '')

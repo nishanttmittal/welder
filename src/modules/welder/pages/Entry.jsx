@@ -9,14 +9,15 @@ import { useMemo, useState, useEffect, useRef } from 'react'
 import { Button, Card, FieldLabel, Select, NumberInput, TextInput, useToast, Toast } from '../../../core/ui'
 import { todayStr, daysAgoStr, fmtNum, fmtDate } from '../../../core/utils/format'
 import { useWelder } from '../WelderContext'
-import { FINISHES, finishedName, isPlatingFinish, SOURCE_APP, WORKFLOW_STAGE, DEFAULT_FACTORY_ID, PLATING_SYNC_FROM, FREEZE_BEFORE, BACKFILL_LOCK_DATE, BACKFILL_FROM } from '../config'
+import { FINISHES, finishedName, isPlatingFinish, SOURCE_APP, WORKFLOW_STAGE, DEFAULT_FACTORY_ID, PLATING_SYNC_FROM, FREEZE_BEFORE } from '../config'
+import { monthLockedOn } from '../logic/pay'
 import { nextWelderChallan, last4 } from '../logic/platingBridge'
 import { computeStock, recipeOf } from '../logic/stock'
 import { makeId } from '../../../core/db/repository'
 import { pushPlatingIncoming } from '../../../core/db/firebase'
 
 export default function Entry({ floor = false, operator = '', by = '' }) {
-  const { dispatches, products, welders, parties, components, receipts, adjustments, counters, log, lastUsed } = useWelder()
+  const { dispatches, products, welders, parties, components, receipts, adjustments, settlements, counters, log, lastUsed } = useWelder()
   const { msg, show } = useToast()
   const remembered = lastUsed.get()
 
@@ -65,19 +66,24 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
     .filter(d => d.date === date && (!welder || d.welder === welder))
     .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
   const canEditDay = date >= daysAgoStr(2)
-  // Manager backfill window: until BACKFILL_LOCK_DATE, a Manager (Anshul) may
-  // back-date to BACKFILL_FROM to fill dispatches a welder who was away never
-  // entered. On/after that date the Manager window reverts to the normal
-  // last-7-days rule automatically (no redeploy). Owner keeps its override (can
-  // always reach FREEZE_BEFORE); shop floor is unchanged.
-  // See config.js → BACKFILL_LOCK_DATE / BACKFILL_FROM.
-  const backfillOpen = todayStr() < BACKFILL_LOCK_DATE
-  // Never let the backfill reach behind the verified-history freeze.
-  const managerBack = backfillOpen
-    ? (BACKFILL_FROM > FREEZE_BEFORE ? BACKFILL_FROM : FREEZE_BEFORE)
-    : daysAgoStr(7)
+  // ── MANAGER WINDOW = "open until the hisab is finalized" (owner rule, 2026-09-09).
+  // The Manager (Anshul) may back-date freely into ANY month whose hisab is NOT
+  // yet finalized for the welder he picked — no calendar deadline, no redeploy.
+  // Finalizing that welder's month in Hisab is what closes it; reopening the
+  // month in Hisab opens it again. Per welder, so Jitender's August can stay
+  // open while Naveen's August is already settled.
+  // FREEZE_BEFORE still caps everything, and the Owner keeps its own override.
+  // This replaces the old date-driven BACKFILL_LOCK_DATE / BACKFILL_FROM pair.
+  const hisabLock = monthLockedOn(settlements.list, welder, date)
+  // FAIL CLOSED. A listener error (Firestore quota exhausted, rules deny, first
+  // run offline) leaves settlements.list EMPTY — identical to "nothing finalized".
+  // Trusting that would silently unlock every settled month, so when the
+  // settlements collection has not actually loaded the Manager drops back to the
+  // plain last-7-days rule. See FirestoreProvider → useCloudCollection.loaded.
+  const settlementsReady = settlements.loaded
+  const managerBack = settlementsReady ? FREEZE_BEFORE : daysAgoStr(7)
   // Manager date rule. Owner & shop floor have their own windows.
-  const managerDateOk = floor || by === 'Owner' || date >= managerBack
+  const managerDateOk = floor || by === 'Owner' || (date >= managerBack && !hisabLock)
   // History freeze: nobody (incl. owner) may create/back-date before this. Unchanged.
   const frozen = date < FREEZE_BEFORE
 
@@ -112,6 +118,7 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
     if (plating && !gaadi.trim()) return show('Enter the gaadi (vehicle) number', 2500)
     if (filled.length === 0) return show('Add at least one product + quantity', 2500)
     if (frozen) return show(`🔒 Dates before ${FREEZE_BEFORE} are locked (verified history). Pick 1 June 2026 or later.`, 3500)
+    if (!managerDateOk && hisabLock) return show(`🔒 ${welder} ka ${hisabLock.month} hisab final ho chuka hai — us mahine ki entry band hai. Owner se Hisab me reopen karwao.`, 5000)
     if (!managerDateOk) return show(`That date is locked — pick ${fmtDate(managerBack)} or later`, 3000)
     // Duplicate alarm: same product + same gaadi already entered today.
     const g = gaadi.trim()
@@ -207,7 +214,7 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
               : <Select className="mt-1" value={welder} onChange={e => setWelder(e.target.value)} options={welders.list.map(w => ({ value: w.name, label: w.name }))} />}
           </div>
           <div>
-            <FieldLabel>Date {floor ? <span className="text-slate-400 font-normal normal-case">(today or last 2 days)</span> : (by !== 'Owner' && <span className="text-slate-400 font-normal normal-case">({backfillOpen ? `backfill open from ${fmtDate(managerBack)}` : 'last 7 days'})</span>)}</FieldLabel>
+            <FieldLabel>Date {floor ? <span className="text-slate-400 font-normal normal-case">(today or last 2 days)</span> : (by !== 'Owner' && <span className="text-slate-400 font-normal normal-case">({settlementsReady ? 'open until hisab is finalized' : 'last 7 days'})</span>)}</FieldLabel>
             {/* Date window by role: shop floor = today + last 2 days; Manager =
                 last 7 days (managerDateOk is the real guard on save); Owner = back
                 to the freeze cutoff only. NOTHING before FREEZE_BEFORE (=1 June,
@@ -219,6 +226,17 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
             {frozen && (
               <div className="mt-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-sm text-red-700 font-semibold">
                 🔒 Locked — dates before {FREEZE_BEFORE} are the verified history. Pick 1 June 2026 or later.
+              </div>
+            )}
+            {/* Hisab lock — shown BEFORE he fills the whole challan, not after Save. */}
+            {!floor && by !== 'Owner' && !frozen && hisabLock && (
+              <div className="mt-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-sm text-red-700 font-semibold">
+                🔒 {welder} ka {hisabLock.month} hisab final ho chuka hai — us mahine ki entry band hai. Owner se Hisab me reopen karwao.
+              </div>
+            )}
+            {!floor && by !== 'Owner' && !settlementsReady && (
+              <div className="mt-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-sm text-amber-800 font-semibold">
+                ⚠️ Hisab data load nahi hua — abhi sirf last 7 din ki entry ho sakti hai. Internet check karo.
               </div>
             )}
           </div>

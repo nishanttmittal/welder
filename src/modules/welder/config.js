@@ -136,33 +136,32 @@ export const PLATING_SYNC_FROM = '2026-06-01'
 export const FREEZE_BEFORE = '2026-06-01'
 
 /**
- * MANAGER BACKFILL WINDOW (temporary, re-openable).
- * When a welder is away and never enters his own dispatches, the Manager (Anshul)
- * fills the gap. While open, the Manager can back-date to BACKFILL_FROM instead of
- * the normal last-7-days rule; Owner can always reach FREEZE_BEFORE regardless.
- * On BACKFILL_LOCK_DATE the Manager window auto-reverts to last-7-days — it flips
- * by calendar date, so NO redeploy is needed to close it.
+ * MANAGER BACKFILL WINDOW — RETIRED 2026-09-09 (owner rule).
  *
- * History:
+ * The old scheme was a pair of hardcoded dates (BACKFILL_LOCK_DATE /
+ * BACKFILL_FROM) that had to be pushed out and redeployed every time the
+ * Manager (Anshul) needed to fill a month a welder never entered. It was
+ * reopened four times (28-Jul, 12-Aug, 26-Aug, 07-Sep) and each time it slammed
+ * shut on a calendar date that had nothing to do with whether the month's money
+ * was actually settled — on 07-Sep an audit found August still unfinished and
+ * September almost empty.
+ *
+ * REPLACED BY: "open until the hisab is finalized". The Manager can now
+ * back-date into ANY month whose hisab is not yet finalized for the welder he
+ * picked, all the way to FREEZE_BEFORE. Finalizing that welder's month in Hisab
+ * is what locks it; reopening the month unlocks it. No dates in code, no
+ * redeploy, and the lock now tracks the thing that actually matters — the money
+ * being settled. Implemented in logic/pay.js → monthLockedOn() and applied in
+ * pages/Entry.jsx. Owner override and FREEZE_BEFORE are unchanged.
+ *
+ * History of the retired date window (kept for context):
  * - Jun–Jul backfill opened, then CLOSED 2026-07-13 (owner confirmed both months done).
- * - 2026-07-28 (owner request): Jitender was at home and made no entries, so the
- *   window is REOPENED for Anshul from 15 July. Open today + tomorrow; it
- *   auto-closes on 2026-07-30. Owner override intact; no existing data touched.
- * - 2026-08-12 (owner request): reopen July + August for Anshul to check on
- *   13 August. Open from 1 July through 13 August; auto-close on 14 August.
- * - 2026-08-26 (owner request): reopen August so Jitender's month is completed
- *   (Anshul enters, picking Jitender in the Welder dropdown). Open from 1 August
- *   through month end; auto-closes on 1 September.
- * - 2026-09-07 (owner request): reopen August AND September for Anshul. Open from
- *   1 August through 30 September; auto-closes on 1 October.
- * To reopen later: push BACKFILL_LOCK_DATE out and set BACKFILL_FROM to the
- * earliest date the Manager should reach (never earlier than FREEZE_BEFORE).
+ * - 2026-07-28: reopened for Jitender's missing entries; auto-closed 2026-07-30.
+ * - 2026-08-12: July + August reopened; auto-closed 14 August.
+ * - 2026-08-26: August reopened so Jitender's month could be completed.
+ * - 2026-09-07: August + September reopened; would have auto-closed 1 October.
+ * - 2026-09-09: constants deleted, rule replaced by the hisab-finalized check.
  */
-export const BACKFILL_LOCK_DATE = '2026-10-01'
-
-/** Earliest date the Manager may back-date to while the backfill window is open.
- *  Clamped by FREEZE_BEFORE — verified history can never be re-opened. */
-export const BACKFILL_FROM = '2026-08-01'
 
 /** Welder challan prefix from the welder's name, e.g. "Naveen" → "NAV". */
 export const welderPrefix = (name) => ((name || '').replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase() || 'WLD')
