@@ -43,6 +43,11 @@ function useCloudCollection(collPath, docPath, normalize, authKey) {
   // Anything that must FAIL CLOSED on missing data (see Entry.jsx's hisab lock)
   // has to check this flag, never just `list.length`.
   const [loaded, setLoaded] = useState(false)
+  // loadFailed — the listener actually ERRORED (vs just not answered yet). Needed
+  // so the UI can say "checking…" while it waits and only warn once it truly
+  // failed; showing the locked-down fallback during the normal first second made
+  // it look like the app was blocking the user when it was merely loading.
+  const [loadFailed, setLoadFailed] = useState(false)
   useEffect(() => {
     const unsub = onSnapshot(
       collPath(),
@@ -55,9 +60,9 @@ function useCloudCollection(collPath, docPath, normalize, authKey) {
       (snap) => {
         setList(snap.docs.map(d => normalize({ id: d.id, ...d.data() })))
         setPending(snap.metadata.hasPendingWrites)
-        setLoaded(true)
+        setLoaded(true); setLoadFailed(false)
       },
-      () => { setList([]); setLoaded(false) }
+      () => { setList([]); setLoaded(false); setLoadFailed(true) }
     )
     return unsub
   }, [authKey]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -66,6 +71,7 @@ function useCloudCollection(collPath, docPath, normalize, authKey) {
   return {
     list,
     loaded,
+    loadFailed,
     pending,
     failed,
     clearFailed: () => setFailed(0),

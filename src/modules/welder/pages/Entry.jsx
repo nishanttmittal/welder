@@ -81,6 +81,11 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
   // settlements collection has not actually loaded the Manager drops back to the
   // plain last-7-days rule. See FirestoreProvider → useCloudCollection.loaded.
   const settlementsReady = settlements.loaded
+  // Three states, not two: still LOADING (normal, first second) vs actually
+  // FAILED. Both fall back to last-7-days for safety, but only a real failure
+  // gets a warning — "last 7 days" flashing during a normal load made it look
+  // like the app was refusing the user.
+  const settlementsLoading = !settlements.loaded && !settlements.loadFailed
   const managerBack = settlementsReady ? FREEZE_BEFORE : daysAgoStr(7)
   // Manager date rule. Owner & shop floor have their own windows.
   const managerDateOk = floor || by === 'Owner' || (date >= managerBack && !hisabLock)
@@ -214,7 +219,7 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
               : <Select className="mt-1" value={welder} onChange={e => setWelder(e.target.value)} options={welders.list.map(w => ({ value: w.name, label: w.name }))} />}
           </div>
           <div>
-            <FieldLabel>Date {floor ? <span className="text-slate-400 font-normal normal-case">(today or last 2 days)</span> : (by !== 'Owner' && <span className="text-slate-400 font-normal normal-case">({settlementsReady ? 'open until hisab is finalized' : 'last 7 days'})</span>)}</FieldLabel>
+            <FieldLabel>Date {floor ? <span className="text-slate-400 font-normal normal-case">(today or last 2 days)</span> : (by !== 'Owner' && <span className="text-slate-400 font-normal normal-case">({settlementsReady ? 'open until hisab is finalized' : settlementsLoading ? 'checking hisab…' : 'last 7 days'})</span>)}</FieldLabel>
             {/* Date window by role: shop floor = today + last 2 days; Manager =
                 last 7 days (managerDateOk is the real guard on save); Owner = back
                 to the freeze cutoff only. NOTHING before FREEZE_BEFORE (=1 June,
@@ -234,7 +239,7 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
                 🔒 {welder} ka {hisabLock.month} hisab final ho chuka hai — us mahine ki entry band hai. Owner se Hisab me reopen karwao.
               </div>
             )}
-            {!floor && by !== 'Owner' && !settlementsReady && (
+            {!floor && by !== 'Owner' && settlements.loadFailed && (
               <div className="mt-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-sm text-amber-800 font-semibold space-y-2">
                 <div>⚠️ Hisab data load nahi hua — isliye abhi sirf last 7 din ki entry ho sakti hai. Internet check karo, phir Retry dabao.</div>
                 <button type="button" onClick={() => window.location.reload()}
@@ -247,7 +252,8 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
                 on a stale cached build. */}
             {!floor && (
               <div className="mt-1.5 text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">
-                ℹ️ earliest date: <span className="font-bold text-slate-700">{by === 'Owner' ? fmtDate(FREEZE_BEFORE) : fmtDate(managerBack)}</span> · build {__BUILD_ID__}
+                ℹ️ earliest date: <span className="font-bold text-slate-700">{by === 'Owner' ? fmtDate(FREEZE_BEFORE) : fmtDate(managerBack)}</span>
+                {by !== 'Owner' && <> · hisab {settlementsReady ? 'loaded ✓' : settlementsLoading ? 'checking…' : 'FAILED ✗'}</>} · build {__BUILD_ID__}
               </div>
             )}
           </div>
