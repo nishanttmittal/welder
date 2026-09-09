@@ -203,14 +203,18 @@ export function lockedOn(settlements, welder, date) {
  * August hisab screen shows while the money already carried forward stays put —
  * a silent divergence. Blocking the whole finalized month closes that.
  *
- * Payments/advances deliberately keep the looser cut-off rule (lockedOn) — they
- * belong to the open settlement window, not to a calendar month.
+ * Deliberately does NOT look at cutoffDate. A settlement's cut-off routinely
+ * runs into the NEXT month (real data: July was finalized with cutoff 13-Aug,
+ * because early-August payments were counted against July). Cut-off is the right
+ * boundary for MONEY — payments/advances keep it via lockedOn() — but production
+ * is counted in its own calendar month, so a 5-Aug dispatch belongs to August's
+ * earned and must stay editable while August is open. Testing the cut-off here
+ * would wrongly lock 1–13 August, exactly the gap the Manager needs to fill.
  */
 export function monthLockedOn(settlements, welder, date) {
   if (!settlements || !date) return null
   const ym = date.slice(0, 7)
-  return settlements.find(s => s.welder === welder && s.locked !== false &&
-    (s.month === ym || (s.cutoffDate || '') >= date)) || null
+  return settlements.find(s => s.welder === welder && s.locked !== false && s.month === ym) || null
 }
 
 /** "Sri Ram (Manager)" / "Manager" / "" from a payment or ledger record. */
