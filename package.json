@@ -9,11 +9,13 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist --dotfiles --nojekyll",
+    "deploy": "bash scripts/deploy-hosting.sh && npm run deploy:gh",
     "review": "bash /home/nishel/unico-tools/gemini-review.sh",
     "export-review": "bash /home/nishel/unico-tools/export-review.sh",
     "gpt-review": "bash /home/nishel/unico-tools/gpt-review.sh",
-    "test": "node --test src/core/db/authDomain.test.mjs"
+    "test": "node --test src/core/db/authDomain.test.mjs",
+    "deploy:gh": "gh-pages -d dist --dotfiles --nojekyll -r git@github.com:nishanttmittal/welder.git",
+    "deploy:hosting": "bash scripts/deploy-hosting.sh"
   },
   "dependencies": {
     "firebase": "^12.14.0",
