@@ -235,8 +235,19 @@ export default function Entry({ floor = false, operator = '', by = '' }) {
               </div>
             )}
             {!floor && by !== 'Owner' && !settlementsReady && (
-              <div className="mt-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-sm text-amber-800 font-semibold">
-                ⚠️ Hisab data load nahi hua — abhi sirf last 7 din ki entry ho sakti hai. Internet check karo.
+              <div className="mt-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-sm text-amber-800 font-semibold space-y-2">
+                <div>⚠️ Hisab data load nahi hua — isliye abhi sirf last 7 din ki entry ho sakti hai. Internet check karo, phir Retry dabao.</div>
+                <button type="button" onClick={() => window.location.reload()}
+                  className="w-full bg-amber-600 text-white rounded-lg py-2 font-bold active:bg-amber-700">🔄 Retry</button>
+              </div>
+            )}
+            {/* Always show the REAL earliest date + build stamp. A worker saying
+                "it won't let me" is otherwise undiagnosable from the office —
+                this one line tells us the rule in force AND whether the phone is
+                on a stale cached build. */}
+            {!floor && (
+              <div className="mt-1 text-[10px] text-slate-400">
+                {by === 'Owner' ? `earliest: ${fmtDate(FREEZE_BEFORE)}` : `earliest: ${fmtDate(managerBack)}`} · build {__BUILD_ID__}
               </div>
             )}
           </div>

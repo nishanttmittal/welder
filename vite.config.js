@@ -9,8 +9,15 @@ import { VitePWA } from 'vite-plugin-pwa'
 //     sign-in that works inside the installed iPhone PWA (github.io could not).
 const BASE = process.env.APP_BASE || '/welder/'
 
+// Build stamp — shown in the app so we can tell AT A GLANCE whether a phone is
+// running the current build or a stale cached one. A worker "still can't do X"
+// after a deploy is almost always a stale service-worker cache; without this we
+// were guessing. Bumped automatically on every build.
+const BUILD_ID = new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 16).replace('T', ' ') + ' IST'
+
 export default defineConfig({
   base: BASE,
+  define: { __BUILD_ID__: JSON.stringify(BUILD_ID) },
   plugins: [
     react(),
     tailwindcss(),
