@@ -63,10 +63,12 @@ export const STOCK_TXN = { INCOMING: 'INCOMING', AUTO_DEDUCT: 'AUTO_DEDUCT', MAN
 /**
  * Finishes a welded product can be sent for. The finish is appended AFTER the
  * product name (e.g. "Spider Chrome"). Default party is a hint for the entry
- * form; the welder can still change it.
+ * form; the welder can still change it. `askParty` = several job-workers do this
+ * finish (chrome: Sriram, Deep Chrome, Gulab…), so the form starts blank and the
+ * welder must pick — no pre-fill, not even the last-used party.
  */
 export const FINISHES = [
-  { key: 'chrome',   label: 'Chrome',    suffix: 'Chrome',    defaultParty: 'Sriram' },
+  { key: 'chrome',   label: 'Chrome',    suffix: 'Chrome',    defaultParty: '', askParty: true },
   { key: 'powder',   label: 'Powder',    suffix: 'Powder',    defaultParty: 'Powder Coating Dept' },
   { key: 'gold',     label: 'Gold',      suffix: 'Gold',      defaultParty: 'JP Metal Works' },
   { key: 'rosegold', label: 'Rose Gold', suffix: 'Rose Gold', defaultParty: 'JP Metal Works' },
